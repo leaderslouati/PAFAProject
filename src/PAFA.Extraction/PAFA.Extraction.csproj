@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<TargetFramework>net9.0</TargetFramework>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<Nullable>enable</Nullable>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\PAFA.Domain\PAFA.Domain.csproj" />
+		<ProjectReference Include="..\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
+		<ProjectReference Include="..\PAFA.Messaging\PAFA.Messaging.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="MassTransit.RabbitMQ" Version="8.*" />
+		<PackageReference Include="MediatR" Version="12.*" />
+	</ItemGroup>
+
+</Project>

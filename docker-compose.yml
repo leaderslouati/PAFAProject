@@ -1,0 +1,48 @@
+name: pafa-project
+
+# On inclut la base de données
+include:
+  - docker-compose.psql.dev.yml
+
+services:
+  # 1. Le Message Broker (RabbitMQ)
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: pafa_rabbitmq
+    ports:
+      - "5672:5672"   # Port AMQP pour .NET
+      - "15672:15672" # Interface Web de management
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_running" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 2. Votre première brique métier (Commentée pour l'instant)
+  # Une fois que vous aurez créé le Dockerfile pour src/PAFA.Api, 
+  # vous pourrez décommenter ce bloc.
+  # pafa-api:
+  #   build:
+  #     dockerfile: ./src/PAFA.Api/Dockerfile
+  #     context: .
+  #   image: pafa-api:latest
+  #   ports:
+  #     - "5000:8080"
+  #   environment:
+  #     - ASPNETCORE_ENVIRONMENT=Development
+  #     - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=pafadb;Username=postgres;Password=postgres
+  #     - RabbitMq__Host=rabbitmq
+  #     - RabbitMq__Username=guest
+  #     - RabbitMq__Password=guest
+  #   depends_on:
+  #     db:
+  #       condition: service_healthy
+  #     rabbitmq:
+  #       condition: service_healthy
+
+networks:
+  default:
+    name: pafa_network
