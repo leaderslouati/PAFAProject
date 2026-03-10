@@ -7,4 +7,3 @@
         public DateTime IngestedAt { get; set; }
         public string StoragePath { get; set; } = string.Empty; 
     }
-}

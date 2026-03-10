@@ -8,7 +8,7 @@ using IMediator = MediatR.IMediator;
 namespace PAFA.Api.Controllers
 {
     [ApiController]
-    [Route("api/[controller]")]
+    [Route("api/extract")]
     public class ExtractionController : ControllerBase
     {
         private readonly IMediator _mediator;
@@ -21,8 +21,6 @@ namespace PAFA.Api.Controllers
         [HttpPost("simulate-download")]
         public async Task<IActionResult> SimulateDownload([FromQuery] string fileName)
         {
-            // Le Controller envoie la commande à MediatR. 
-            // C'est le Handler dans le projet PAFA.Extraction qui fera le travail.
             var command = new IngestFileCommand(fileName);
             var fileId = await _mediator.Send(command);
 
