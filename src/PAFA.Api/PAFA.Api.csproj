@@ -8,22 +8,19 @@
 
   <ItemGroup>
     <PackageReference Include="MassTransit.RabbitMQ" Version="9.0.1" />
-    <PackageReference Include="MediatR" Version="12.4.1" />
+    <PackageReference Include="MediatR" Version="12.5.0" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.7">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
-    <PackageReference Include="Swashbuckle.AspNetCore" Version="8.0.1" />
+    <PackageReference Include="Swashbuckle.AspNetCore" Version="9.0.6" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\PAFA.Extraction\PAFA.Extraction.csproj" />
     <ProjectReference Include="..\PAFA.Messaging\PAFA.Messaging.csproj" />
     <ProjectReference Include="..\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Folder Include="Controllers\" />
+    <ProjectReference Include="..\PAFA.Reports\PAFA.Reports.csproj" />
   </ItemGroup>
 
 </Project>

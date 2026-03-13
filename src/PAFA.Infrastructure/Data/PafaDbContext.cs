@@ -15,11 +15,11 @@ public class PafaDbContext : DbContext
 
     // ── Schema DBO — Business Entities ──────────────────────────────────
     public DbSet<Shipper>               Shippers              { get; set; }
-    public DbSet<ShipperAlias>          ShipperAliases        { get; set; }
     public DbSet<ProductClass>          ProductClasses        { get; set; }
     public DbSet<ShipperProductClass>   ShipperProductClasses { get; set; }
     public DbSet<ReportType>            ReportTypes           { get; set; }
     public DbSet<Report>                Reports               { get; set; }
+    public DbSet <MetricValue>           MetricValues          { get; set; }
 
     // ── Schema ETL — Ingestion Pipeline ─────────────────────────────────
     public DbSet<IngestionJob>    IngestionJobs    { get; set; }

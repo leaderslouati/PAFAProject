@@ -16,10 +16,8 @@ public class Shipper : BaseEntity
     /// <summary>Associated legal entity (may differ from trade name).</summary>
     public string? LegalEntity { get; set; }
 
-    /// <summary>Compliance officer email — encrypted using Always Encrypted in production.</summary>
-    public string? ContactEmail { get; set; }
-
-    public string? ContactName { get; set; }
+    /// <summary>Compliance officer email.</summary>
+    public string? Email { get; set; }
 
     public bool IsActive { get; set; } = true;
 
@@ -32,6 +30,5 @@ public class Shipper : BaseEntity
     public int? PortfolioSize { get; set; }
 
     // ── Navigation ──────────────────────────────────────────────────────
-    public ICollection<ShipperAlias> Aliases { get; set; } = new List<ShipperAlias>();
     public ICollection<ShipperProductClass> ProductClasses { get; set; } = new List<ShipperProductClass>();
 }

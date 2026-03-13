@@ -27,8 +27,7 @@ public class ShipperConfiguration : IEntityTypeConfiguration<Shipper>
          .HasDatabaseName("UK_Shipper_ShortCode");
 
         b.Property(x => x.LegalEntity).HasMaxLength(300);
-        b.Property(x => x.ContactEmail).HasMaxLength(254);
-        b.Property(x => x.ContactName).HasMaxLength(200);
+        b.Property(x => x.Email).HasMaxLength(254);
 
         b.Property(x => x.IsActive).HasDefaultValue(true);
 

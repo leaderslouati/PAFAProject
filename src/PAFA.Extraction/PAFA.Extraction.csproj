@@ -14,12 +14,8 @@
 
 	<ItemGroup>
 		<PackageReference Include="MediatR" Version="12.*" />
+		<PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.9" />
 		<PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
-	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="Commands\Import\" />
-	  <Folder Include="Handlers\" />
 	</ItemGroup>
 
 </Project>

@@ -6,7 +6,7 @@ namespace PAFA.Domain.Entities.ETL;
 /// Monthly ingestion job — represents a complete execution of the Xoserve SFTP pipeline.
 /// One primary job per PARR cycle (unique constraint on PeriodYear + PeriodMonth).
 /// </summary>
-public class IngestionJob
+public class IngestionJob : BaseEntity
 {
     public Guid   Id             { get; set; } = Guid.NewGuid();
 
@@ -38,7 +38,5 @@ public class IngestionJob
     public Guid?  ParentJobId   { get; set; }
 
     // ── Navigation ──────────────────────────────────────────────────────
-    public IngestionJob?              ParentJob { get; set; }
-    public ICollection<IngestionJob>  ChildJobs { get; set; } = new List<IngestionJob>();
     public ICollection<IngestionFile> Files     { get; set; } = new List<IngestionFile>();
 }

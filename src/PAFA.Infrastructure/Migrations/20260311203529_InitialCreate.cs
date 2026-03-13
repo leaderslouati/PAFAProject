@@ -43,17 +43,41 @@ namespace PAFA.Infrastructure.Migrations
                     TriggeredBy = table.Column<int>(type: "integer", nullable: false),
                     StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    ParentJobId = table.Column<Guid>(type: "uuid", nullable: true)
+                    ParentJobId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: false)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_IngestionJobs", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_IngestionJobs_IngestionJobs_ParentJobId",
-                        column: x => x.ParentJobId,
-                        principalSchema: "public",
-                        principalTable: "IngestionJobs",
-                        principalColumn: "Id");
+                });
+
+            migrationBuilder.CreateTable(
+                name: "MetricValues",
+                schema: "public",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    IngestionFileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ShipperShortCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
+                    MetricKey = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Value = table.Column<decimal>(type: "numeric(18,4)", nullable: false),
+                    PeriodYear = table.Column<int>(type: "integer", nullable: false),
+                    PeriodMonth = table.Column<int>(type: "integer", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW()"),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false, defaultValue: false),
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_MetricValues", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -103,8 +127,7 @@ namespace PAFA.Infrastructure.Migrations
                     Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
                     ShortCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     LegalEntity = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: true),
-                    ContactEmail = table.Column<string>(type: "character varying(254)", maxLength: 254, nullable: true),
-                    ContactName = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    Email = table.Column<string>(type: "character varying(254)", maxLength: 254, nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     MarketEntryDate = table.Column<DateOnly>(type: "date", nullable: true),
                     MarketExitDate = table.Column<DateOnly>(type: "date", nullable: true),
@@ -201,32 +224,6 @@ namespace PAFA.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
-                name: "ShipperAlias",
-                schema: "dbo",
-                columns: table => new
-                {
-                    Id = table.Column<int>(type: "integer", nullable: false)
-                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
-                    ShipperId = table.Column<Guid>(type: "uuid", nullable: false),
-                    AliasCode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    ValidFrom = table.Column<DateOnly>(type: "date", nullable: false),
-                    ValidTo = table.Column<DateOnly>(type: "date", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
-                    CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false, defaultValue: "SYSTEM")
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_ShipperAlias", x => x.Id);
-                    table.ForeignKey(
-                        name: "FK_ShipperAlias_Shipper",
-                        column: x => x.ShipperId,
-                        principalSchema: "dbo",
-                        principalTable: "Shipper",
-                        principalColumn: "Id",
-                        onDelete: ReferentialAction.Restrict);
-                });
-
-            migrationBuilder.CreateTable(
                 name: "ShipperProductClass",
                 schema: "dbo",
                 columns: table => new
@@ -317,10 +314,16 @@ namespace PAFA.Infrastructure.Migrations
                 columns: new[] { "IngestionJobId", "Status" });
 
             migrationBuilder.CreateIndex(
-                name: "IX_IngestionJobs_ParentJobId",
+                name: "IX_MetricValue_Period",
                 schema: "public",
-                table: "IngestionJobs",
-                column: "ParentJobId");
+                table: "MetricValues",
+                columns: new[] { "PeriodYear", "PeriodMonth" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_MetricValue_Shipper",
+                schema: "public",
+                table: "MetricValues",
+                column: "ShipperShortCode");
 
             migrationBuilder.CreateIndex(
                 name: "UK_ProductClass_Code",
@@ -375,19 +378,6 @@ namespace PAFA.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "IX_ShipperAlias_ShipperId_Period",
-                schema: "dbo",
-                table: "ShipperAlias",
-                columns: new[] { "ShipperId", "ValidFrom", "ValidTo" });
-
-            migrationBuilder.CreateIndex(
-                name: "UK_ShipperAlias_Code",
-                schema: "dbo",
-                table: "ShipperAlias",
-                column: "AliasCode",
-                unique: true);
-
-            migrationBuilder.CreateIndex(
                 name: "IX_ShipperProductClass_ProductClassId",
                 schema: "dbo",
                 table: "ShipperProductClass",
@@ -410,11 +400,11 @@ namespace PAFA.Infrastructure.Migrations
         protected override void Down(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.DropTable(
-                name: "Report",
-                schema: "dbo");
+                name: "MetricValues",
+                schema: "public");
 
             migrationBuilder.DropTable(
-                name: "ShipperAlias",
+                name: "Report",
                 schema: "dbo");
 
             migrationBuilder.DropTable(

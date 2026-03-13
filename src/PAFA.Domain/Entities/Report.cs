@@ -8,15 +8,17 @@ namespace PAFA.Domain.Entities;
 /// </summary>
 public class Report : BaseEntity
 {
-    public Guid   Id             { get; set; } = Guid.NewGuid();
+    public Guid   Id { get; set; } = Guid.NewGuid();
 
-    public int    ReportTypeId   { get; set; }
+    public int ReportTypeId   { get; set; }
 
-    /// <summary>Report number within the schedule (1 to 22).</summary>
-    public int    ScheduleNumber { get; set; }
+    /// <summary>
+    /// Report number within the schedule (1 to 22).
+    /// </summary>
+    public int ScheduleNumber { get; set; }
 
     /// <summary>Full title (e.g., "2A.1 Estimated & Check Reads – Products 1 & 2").</summary>
-    public string Title          { get; set; } = string.Empty;
+    public string Title { get; set; } = string.Empty;
 
     public int    PeriodYear     { get; set; }
 
@@ -45,5 +47,5 @@ public class Report : BaseEntity
     public bool    IsBaseline     { get; set; } = false;
 
     // ── Navigation ──────────────────────────────────────────────────────
-    public ReportType                  ReportType   { get; set; } = null!;
+    public ReportType  ReportType   { get; set; } = null!;
 }
