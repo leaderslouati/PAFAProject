@@ -2,54 +2,46 @@
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PAFA.Domain.Entities;
 
-namespace PAFA.Infrastructure.Data.EntityConfigurations
+namespace PAFA.Infrastructure.Persistence.Configurations;
+
+public class MetricValueConfiguration : IEntityTypeConfiguration<MetricValue>
 {
-    public class MetricValueConfiguration : IEntityTypeConfiguration<MetricValue>
+    public void Configure(EntityTypeBuilder<MetricValue> b)
     {
-        public void Configure(EntityTypeBuilder<MetricValue> builder)
-        {
-            // Nom de la table et schéma (optionnel, "dbo" ou "public" selon ta config PostgreSQL)
-            builder.ToTable("MetricValues");
+        b.ToTable("metric_values");
 
-            // Clé primaire
-            builder.HasKey(m => m.Id);
+        b.HasKey(x => x.Id);
+        b.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
 
-            // Propriétés héritées de BaseEntity
-            builder.Property(m => m.CreatedAt)
-                   .IsRequired()
-                   .HasDefaultValueSql("NOW()"); 
+        b.Property(x => x.ReportingPeriod).IsRequired().HasColumnType("date");
+        b.Property(x => x.ShipperShortCode).IsRequired().HasMaxLength(10);
+        b.Property(x => x.MetricKey).IsRequired().HasMaxLength(60);
+        b.Property(x => x.Value).HasColumnType("numeric(12,4)");
+        b.Property(x => x.CreatedBy).HasMaxLength(100);
+        b.Property(x => x.RowVersion).IsRowVersion().IsRequired(false);
 
-            builder.Property(m => m.IsDeleted)
-                   .IsRequired()
-                   .HasDefaultValue(false);
+        // ── Contrainte unicité : évite les doublons à l'import ──────
+        // Un seul enregistrement par shipper / période / métrique / fichier
+        b.HasIndex(x => new {
+            x.IngestionFileId,
+            x.ShipperShortCode,
+            x.ReportingPeriod,
+            x.MetricKey
+        })
+            .IsUnique()
+            .HasDatabaseName("ix_mv_unique");
 
-            builder.HasQueryFilter(m => !m.IsDeleted);
+        // ── Index pour requêtes Power BI ────────────────────────────
+        b.HasIndex(x => x.ReportingPeriod).HasDatabaseName("ix_mv_period");
+        b.HasIndex(x => x.ShipperShortCode).HasDatabaseName("ix_mv_ssc");
+        b.HasIndex(x => x.MetricKey).HasDatabaseName("ix_mv_metric_key");
+        b.HasIndex(x => new { x.ReportingPeriod, x.MetricKey })
+            .HasDatabaseName("ix_mv_period_key");
 
-            builder.Property(m => m.ShipperShortCode)
-                   .IsRequired()
-                   .HasMaxLength(10); 
-
-            builder.Property(m => m.MetricKey)
-                   .IsRequired()
-                   .HasMaxLength(100); // Ex: PC1_READ_PERF 
-
-            builder.Property(m => m.Value)
-                   .IsRequired()
-                   .HasColumnType("decimal(18,4)"); // Précision importante pour les métriques de gaz 
-
-            builder.Property(m => m.PeriodYear)
-                   .IsRequired();
-
-            builder.Property(m => m.PeriodMonth)
-                   .IsRequired();
-
-            // Index pour optimiser les requêtes PowerBI (qui filtreront souvent par année/mois)
-            builder.HasIndex(m => new { m.PeriodYear, m.PeriodMonth })
-                   .HasDatabaseName("IX_MetricValue_Period");
-
-            // Index pour la recherche par Shipper
-            builder.HasIndex(m => m.ShipperShortCode)
-                   .HasDatabaseName("IX_MetricValue_Shipper");
-        }
+        // ── Relation FK → IngestionFile ─────────────────────────────
+        b.HasOne(x => x.IngestionFile)
+            .WithMany(x => x.MetricValues)
+            .HasForeignKey(x => x.IngestionFileId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

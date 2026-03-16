@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
-using PAFA.Infrastructure.Data;
+using PAFA.Infrastructure.Persistence;
 
 #nullable disable
 
@@ -17,77 +17,54 @@ namespace PAFA.Infrastructure.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasDefaultSchema("public")
                 .HasAnnotation("ProductVersion", "9.0.7")
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
-            modelBuilder.Entity("PAFA.Domain.Entities.ETL.IngestionJob", b =>
+            modelBuilder.Entity("MetricValue", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("CompletedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.Property<string>("ErrorSummary")
-                        .HasColumnType("text");
-
-                    b.Property<int>("FilesDownloaded")
-                        .HasColumnType("integer");
-
-                    b.Property<int?>("FilesExpected")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("FilesFailed")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("FilesProcessed")
-                        .HasColumnType("integer");
+                    b.Property<Guid>("IngestionFileId")
+                        .HasColumnType("uuid");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("JobName")
+                    b.Property<string>("MetricKey")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(60)
+                        .HasColumnType("character varying(60)");
 
-                    b.Property<Guid?>("ParentJobId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("PeriodMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PeriodYear")
-                        .HasColumnType("integer");
-
-                    b.Property<long>("RecordsLoaded")
-                        .HasColumnType("bigint");
-
-                    b.Property<int>("RetryCount")
-                        .HasColumnType("integer");
+                    b.Property<DateOnly>("ReportingPeriod")
+                        .HasColumnType("date");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsRequired()
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
-                    b.Property<DateTime>("StartedAt")
-                        .HasColumnType("timestamp with time zone");
+                    b.Property<Guid?>("ShipperId")
+                        .HasColumnType("uuid");
 
-                    b.Property<int>("Status")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("TriggeredBy")
-                        .HasColumnType("integer");
+                    b.Property<string>("ShipperShortCode")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -95,9 +72,30 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
 
+                    b.Property<decimal>("Value")
+                        .HasColumnType("numeric(12,4)");
+
                     b.HasKey("Id");
 
-                    b.ToTable("IngestionJobs", "public");
+                    b.HasIndex("MetricKey")
+                        .HasDatabaseName("ix_mv_metric_key");
+
+                    b.HasIndex("ReportingPeriod")
+                        .HasDatabaseName("ix_mv_period");
+
+                    b.HasIndex("ShipperId");
+
+                    b.HasIndex("ShipperShortCode")
+                        .HasDatabaseName("ix_mv_ssc");
+
+                    b.HasIndex("ReportingPeriod", "MetricKey")
+                        .HasDatabaseName("ix_mv_period_key");
+
+                    b.HasIndex("IngestionFileId", "ShipperShortCode", "ReportingPeriod", "MetricKey")
+                        .IsUnique()
+                        .HasDatabaseName("ix_mv_unique");
+
+                    b.ToTable("metric_values", (string)null);
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.IngestionFile", b =>
@@ -111,22 +109,25 @@ namespace PAFA.Infrastructure.Migrations
                         .HasMaxLength(1000)
                         .HasColumnType("character varying(1000)");
 
-                    b.Property<string>("Checksum")
-                        .HasMaxLength(64)
-                        .HasColumnType("character varying(64)");
-
                     b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<DateTime?>("DownloadedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<int>("ErrorCount")
                         .HasColumnType("integer");
+
+                    b.Property<string>("FileHash")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)");
 
                     b.Property<string>("FileName")
                         .IsRequired()
@@ -151,8 +152,10 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .HasColumnType("bytea");
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasDefaultValueSql("decode('', 'hex')");
 
                     b.Property<int?>("RowsRead")
                         .HasColumnType("integer");
@@ -165,172 +168,230 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<string>("SourceSystem")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasDefaultValue("CDSP");
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("ValidationStatus")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("IngestionJobId", "Status")
-                        .HasDatabaseName("IX_IngestionFile_Job_Status");
+                    b.HasIndex("FileHash")
+                        .HasDatabaseName("ix_file_hash");
 
-                    b.ToTable("IngestionFile", "etl");
+                    b.HasIndex("IngestionJobId");
+
+                    b.ToTable("ingestion_files", (string)null);
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.MetricValue", b =>
+            modelBuilder.Entity("PAFA.Domain.Entities.IngestionJob", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<DateTime?>("CompletedAt")
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW()");
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
                     b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("IngestionFileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<string>("MetricKey")
                         .IsRequired()
                         .HasMaxLength(100)
                         .HasColumnType("character varying(100)");
 
-                    b.Property<int>("PeriodMonth")
+                    b.Property<string>("ErrorSummary")
+                        .HasMaxLength(2000)
+                        .HasColumnType("character varying(2000)");
+
+                    b.Property<int>("FilesDownloaded")
                         .HasColumnType("integer");
 
-                    b.Property<int>("PeriodYear")
+                    b.Property<int?>("FilesExpected")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FilesFailed")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("FilesProcessed")
+                        .HasColumnType("integer");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("JobName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("ParentJobId")
+                        .HasColumnType("uuid");
+
+                    b.Property<long>("RecordsLoaded")
+                        .HasColumnType("bigint");
+
+                    b.Property<DateOnly>("ReportingPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<int>("RetryCount")
                         .HasColumnType("integer");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsRequired()
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
-                    b.Property<string>("ShipperShortCode")
+                    b.Property<DateTime>("StartedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Status")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)");
+
+                    b.Property<string>("TriggeredBy")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Value")
-                        .HasColumnType("decimal(18,4)");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ShipperShortCode")
-                        .HasDatabaseName("IX_MetricValue_Shipper");
+                    b.HasIndex("ParentJobId");
 
-                    b.HasIndex("PeriodYear", "PeriodMonth")
-                        .HasDatabaseName("IX_MetricValue_Period");
+                    b.HasIndex("ReportingPeriod")
+                        .HasDatabaseName("ix_job_period");
 
-                    b.ToTable("MetricValues", "public");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_job_status");
+
+                    b.ToTable("ingestion_jobs", (string)null);
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.ProductClass", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
                     b.Property<decimal?>("AQThresholdHigh")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(12,4)");
 
                     b.Property<decimal?>("AQThresholdLow")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("numeric(12,4)");
 
                     b.Property<string>("Code")
                         .IsRequired()
-                        .HasMaxLength(5)
-                        .HasColumnType("character varying(5)");
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<decimal?>("MinReadPercentage")
-                        .HasColumnType("decimal(5,2)");
+                        .HasColumnType("numeric(6,3)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique()
-                        .HasDatabaseName("UK_ProductClass_Code");
+                        .HasDatabaseName("ix_pc_code");
 
-                    b.ToTable("ProductClass", "dbo");
+                    b.ToTable("product_classes", (string)null);
 
                     b.HasData(
                         new
                         {
                             Id = 1,
+                            AQThresholdLow = 732m,
                             Code = "PC1",
-                            Description = "Class 1 – AQ > 732 MWH (Industrial, large sites)",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SYSTEM",
+                            Description = "Large sites — AQ ≥ 732 MWH",
                             IsActive = true,
+                            IsDeleted = false,
                             MinReadPercentage = 97.5m
                         },
                         new
                         {
                             Id = 2,
-                            AQThresholdHigh = 732m,
-                            AQThresholdLow = 73.2m,
                             Code = "PC2",
-                            Description = "Class 2 – Quarterly read frequency",
-                            IsActive = true
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SYSTEM",
+                            Description = "Medium NDM",
+                            IsActive = true,
+                            IsDeleted = false
                         },
                         new
                         {
                             Id = 3,
-                            AQThresholdHigh = 73.2m,
-                            AQThresholdLow = 0m,
                             Code = "PC3",
-                            Description = "Class 3 – Annual read frequency",
-                            IsActive = true
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SYSTEM",
+                            Description = "Small NDM WAR",
+                            IsActive = true,
+                            IsDeleted = false
                         },
                         new
                         {
                             Id = 4,
-                            AQThresholdLow = 0m,
                             Code = "PC4",
-                            Description = "Class 4 – Low read frequency / automated metering",
-                            IsActive = true
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SYSTEM",
+                            Description = "IGT Small",
+                            IsActive = true,
+                            IsDeleted = false
                         });
                 });
 
@@ -341,12 +402,18 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
                     b.Property<string>("CommentaryBy")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
                     b.Property<string>("CommentaryText")
-                        .HasColumnType("text");
+                        .HasMaxLength(5000)
+                        .HasColumnType("character varying(5000)");
 
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
@@ -355,10 +422,8 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(100)
-                        .HasColumnType("character varying(100)")
-                        .HasDefaultValue("SYSTEM");
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("FilePath_Excel")
                         .HasMaxLength(1000)
@@ -379,15 +444,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(false);
-
-                    b.Property<int>("PeriodMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PeriodYear")
-                        .HasColumnType("integer");
+                        .HasColumnType("boolean");
 
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
@@ -395,9 +452,11 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<int>("ReportTypeId")
                         .HasColumnType("integer");
 
+                    b.Property<DateOnly>("ReportingPeriod")
+                        .HasColumnType("date");
+
                     b.Property<byte[]>("RowVersion")
                         .IsConcurrencyToken()
-                        .IsRequired()
                         .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
@@ -406,15 +465,13 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<string>("Status")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
                         .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasDefaultValue("Pending");
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -425,41 +482,46 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Status", "GeneratedAt")
-                        .HasDatabaseName("IX_Report_Status");
+                    b.HasIndex("Status")
+                        .HasDatabaseName("ix_report_status");
 
-                    b.HasIndex("PeriodYear", "PeriodMonth", "ReportTypeId")
-                        .HasDatabaseName("IX_Report_Period");
-
-                    b.HasIndex("ReportTypeId", "ScheduleNumber", "PeriodYear", "PeriodMonth")
+                    b.HasIndex("ReportTypeId", "ReportingPeriod", "ScheduleNumber")
                         .IsUnique()
-                        .HasDatabaseName("UK_Report_Type_Schedule_Period");
+                        .HasDatabaseName("ix_report_unique");
 
-                    b.ToTable("Report", "dbo");
+                    b.ToTable("reports", (string)null);
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.ReportType", b =>
                 {
                     b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
                         .HasColumnType("integer");
 
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+                    b.Property<string>("Audience")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
 
                     b.Property<string>("Code")
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
 
-                    b.Property<bool>("IsActive")
+                    b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
 
-                    b.Property<bool>("IsAnonymised")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("Label")
                         .IsRequired()
@@ -467,47 +529,181 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("character varying(200)");
 
                     b.Property<int>("ReportCount")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer")
-                        .HasDefaultValue(0);
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bytea");
 
                     b.Property<string>("ScheduleRef")
                         .IsRequired()
                         .HasMaxLength(20)
                         .HasColumnType("character varying(20)");
 
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
                     b.HasKey("Id");
 
                     b.HasIndex("Code")
                         .IsUnique()
-                        .HasDatabaseName("UK_ReportType_Code");
+                        .HasDatabaseName("ix_reporttype_code");
 
-                    b.ToTable("ReportType", "dbo");
+                    b.ToTable("report_types", (string)null);
 
                     b.HasData(
                         new
                         {
                             Id = 1,
+                            Audience = "Industry",
                             Code = "SCH2A",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SYSTEM",
                             IsActive = true,
-                            IsAnonymised = true,
-                            Label = "Industry Peer Comparison View – Anonymised",
+                            IsDeleted = false,
+                            Label = "Industry Peer Comparison (Anonymised)",
                             ReportCount = 19,
                             ScheduleRef = "Schedule 2A"
                         },
                         new
                         {
                             Id = 2,
+                            Audience = "PAC",
                             Code = "SCH2B",
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SYSTEM",
                             IsActive = true,
-                            IsAnonymised = false,
-                            Label = "Performance Assurance Committee View – Full",
+                            IsDeleted = false,
+                            Label = "Performance Assurance Committee (Non-Anonymised)",
                             ReportCount = 22,
                             ScheduleRef = "Schedule 2B"
                         });
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.Shipper", b =>
+            modelBuilder.Entity("PAFA.Domain.Entities.ShipperProductClass", b =>
+                {
+                    b.Property<Guid>("ShipperId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ProductClassId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("ReportingPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasDefaultValueSql("decode('', 'hex')");
+
+                    b.Property<int?>("SupplyPointCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("TotalAQ_MWH")
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("ShipperId", "ProductClassId", "ReportingPeriod");
+
+                    b.HasIndex("ProductClassId");
+
+                    b.ToTable("shipper_product_classes", (string)null);
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.ValidationError", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid")
+                        .HasDefaultValueSql("gen_random_uuid()");
+
+                    b.Property<string>("ColumnName")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ErrorCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ErrorMessage")
+                        .IsRequired()
+                        .HasMaxLength(1000)
+                        .HasColumnType("character varying(1000)");
+
+                    b.Property<Guid>("IngestionFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("LineNumber")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("OriginalValue")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("Severity")
+                        .IsRequired()
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionFileId")
+                        .HasDatabaseName("ix_valerr_file");
+
+                    b.ToTable("validation_errors", (string)null);
+                });
+
+            modelBuilder.Entity("Shipper", b =>
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
@@ -521,23 +717,22 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.Property<string>("Email")
-                        .HasMaxLength(254)
-                        .HasColumnType("character varying(254)");
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
 
                     b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true);
+                        .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("LegalEntity")
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
                     b.Property<DateOnly?>("MarketEntryDate")
                         .HasColumnType("date");
@@ -554,132 +749,67 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("integer");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsRequired()
-                        .HasColumnType("bytea");
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasDefaultValueSql("decode('', 'hex')");
 
                     b.Property<string>("ShortCode")
                         .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .IsFixedLength();
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("Name")
-                        .HasDatabaseName("IX_Shipper_Name");
 
                     b.HasIndex("ShortCode")
                         .IsUnique()
-                        .HasDatabaseName("UK_Shipper_ShortCode");
+                        .HasDatabaseName("ix_shipper_ssc");
 
-                    b.HasIndex("IsActive", "Name")
-                        .HasDatabaseName("IX_Shipper_IsActive_Name");
-
-                    b.ToTable("Shipper", "dbo");
+                    b.ToTable("shippers", (string)null);
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.ShipperProductClass", b =>
+            modelBuilder.Entity("MetricValue", b =>
                 {
-                    b.Property<Guid>("ShipperId")
-                        .HasColumnType("uuid");
+                    b.HasOne("PAFA.Domain.Entities.IngestionFile", "IngestionFile")
+                        .WithMany("MetricValues")
+                        .HasForeignKey("IngestionFileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.Property<int>("ProductClassId")
-                        .HasColumnType("integer");
+                    b.HasOne("Shipper", null)
+                        .WithMany("MetricValues")
+                        .HasForeignKey("ShipperId");
 
-                    b.Property<int>("PeriodYear")
-                        .HasColumnType("integer");
-
-                    b.Property<int>("PeriodMonth")
-                        .HasColumnType("integer");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-
-                    b.Property<int?>("SupplyPointCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("TotalAQ_MWH")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.HasKey("ShipperId", "ProductClassId", "PeriodYear", "PeriodMonth");
-
-                    b.HasIndex("ProductClassId");
-
-                    b.HasIndex("ShipperId", "PeriodYear", "PeriodMonth")
-                        .HasDatabaseName("IX_ShipperProductClass_Shipper_Period");
-
-                    b.ToTable("ShipperProductClass", "dbo");
-                });
-
-            modelBuilder.Entity("PAFA.Domain.Entities.ValidationError", b =>
-                {
-                    b.Property<long>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("bigint");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
-
-                    b.Property<string>("ColumnName")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-
-                    b.Property<string>("ErrorCode")
-                        .IsRequired()
-                        .HasMaxLength(50)
-                        .HasColumnType("character varying(50)");
-
-                    b.Property<string>("ErrorMessage")
-                        .IsRequired()
-                        .HasMaxLength(1000)
-                        .HasColumnType("character varying(1000)");
-
-                    b.Property<Guid>("IngestionFileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int?>("LineNumber")
-                        .HasColumnType("integer");
-
-                    b.Property<string>("OriginalValue")
-                        .HasMaxLength(500)
-                        .HasColumnType("character varying(500)");
-
-                    b.Property<string>("Severity")
-                        .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasDefaultValue("ERROR");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("IngestionFileId", "Severity")
-                        .HasDatabaseName("IX_ValidationError_File_Severity");
-
-                    b.ToTable("ValidationError", "etl");
+                    b.Navigation("IngestionFile");
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.IngestionFile", b =>
                 {
-                    b.HasOne("PAFA.Domain.Entities.ETL.IngestionJob", "IngestionJob")
-                        .WithMany("Files")
+                    b.HasOne("PAFA.Domain.Entities.IngestionJob", "IngestionJob")
+                        .WithMany("IngestionFiles")
                         .HasForeignKey("IngestionJobId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_IngestionFile_IngestionJob");
+                        .IsRequired();
 
                     b.Navigation("IngestionJob");
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.IngestionJob", b =>
+                {
+                    b.HasOne("PAFA.Domain.Entities.IngestionJob", "ParentJob")
+                        .WithMany("RetryJobs")
+                        .HasForeignKey("ParentJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ParentJob");
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.Report", b =>
@@ -688,8 +818,7 @@ namespace PAFA.Infrastructure.Migrations
                         .WithMany("Reports")
                         .HasForeignKey("ReportTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_Report_ReportType");
+                        .IsRequired();
 
                     b.Navigation("ReportType");
                 });
@@ -700,15 +829,13 @@ namespace PAFA.Infrastructure.Migrations
                         .WithMany("ShipperProductClasses")
                         .HasForeignKey("ProductClassId")
                         .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired()
-                        .HasConstraintName("FK_ShipperProductClass_ProductClass");
+                        .IsRequired();
 
-                    b.HasOne("PAFA.Domain.Entities.Shipper", "Shipper")
+                    b.HasOne("Shipper", "Shipper")
                         .WithMany("ProductClasses")
                         .HasForeignKey("ShipperId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_ShipperProductClass_Shipper");
+                        .IsRequired();
 
                     b.Navigation("ProductClass");
 
@@ -721,20 +848,23 @@ namespace PAFA.Infrastructure.Migrations
                         .WithMany("ValidationErrors")
                         .HasForeignKey("IngestionFileId")
                         .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired()
-                        .HasConstraintName("FK_ValidationError_IngestionFile");
+                        .IsRequired();
 
                     b.Navigation("IngestionFile");
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.ETL.IngestionJob", b =>
-                {
-                    b.Navigation("Files");
-                });
-
             modelBuilder.Entity("PAFA.Domain.Entities.IngestionFile", b =>
                 {
+                    b.Navigation("MetricValues");
+
                     b.Navigation("ValidationErrors");
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.IngestionJob", b =>
+                {
+                    b.Navigation("IngestionFiles");
+
+                    b.Navigation("RetryJobs");
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.ProductClass", b =>
@@ -747,8 +877,10 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("Reports");
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.Shipper", b =>
+            modelBuilder.Entity("Shipper", b =>
                 {
+                    b.Navigation("MetricValues");
+
                     b.Navigation("ProductClasses");
                 });
 #pragma warning restore 612, 618

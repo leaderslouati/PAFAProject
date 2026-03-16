@@ -1,6 +1,6 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Design;
-using PAFA.Infrastructure.Data;
+using PAFA.Infrastructure.Persistence;
 using System.IO;
 using System.Text.Json;
 

@@ -1,28 +1,18 @@
 using Microsoft.EntityFrameworkCore;
-using PAFA.Domain.Entities;
 using PAFA.Domain.IRepository;
-using PAFA.Domain.Repositories;
-using PAFA.Infrastructure.Data;
+using PAFA.Infrastructure.Persistence;
 
 namespace PAFA.Infrastructure.Repositories;
 
 /// <summary>
 /// Repository implementation for Shipper entity.
 /// </summary>
-public class ShipperRepository : BaseRepository<Shipper>, IShipperRepository
+public class ShipperRepository(PafaDbContext ctx)
+    : BaseRepository<Shipper>(ctx), IShipperRepository
 {
-    public ShipperRepository(PafaDbContext dbContext) : base(dbContext) { }
-
     public async Task<IReadOnlyList<Shipper>> GetActiveShippersAsync(CancellationToken ct = default)
-    {
-        return await _dbContext.Shippers
-            .Where(s => s.IsActive && !s.IsDeleted)
-            .ToListAsync(ct);
-    }
+        => await _ctx.Shippers.Where(s => s.IsActive).ToListAsync(ct);
 
-    public async Task<Shipper?> GetByShortCodeAsync(string shortCode, CancellationToken ct = default)
-    {
-        return await _dbContext.Shippers
-            .FirstOrDefaultAsync(s => s.ShortCode == shortCode && !s.IsDeleted, ct);
-    }
+    public Task<Shipper?> GetByShortCodeAsync(string ssc, CancellationToken ct = default)
+        => _ctx.Shippers.FirstOrDefaultAsync(s => s.ShortCode == ssc, ct);
 }

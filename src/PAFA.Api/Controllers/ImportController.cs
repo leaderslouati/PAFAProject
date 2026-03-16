@@ -6,14 +6,9 @@ namespace PAFA.Api.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    public class ImportController : ControllerBase
+    public class ImportController(IMediator mediator) : ControllerBase
     {
-        private readonly IMediator _mediator;
-
-        public ImportController(IMediator mediator)
-        {
-            _mediator = mediator;
-        }
+        private readonly IMediator _mediator = mediator;
 
         [HttpPost("upload")]
         public async Task<IActionResult> UploadFile(IFormFile file, [FromForm] int periodYear, [FromForm] int periodMonth)
@@ -21,10 +16,24 @@ namespace PAFA.Api.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest("Le fichier est vide ou invalide.");
 
-            // On crée la commande en y passant le fichier
-            var command = new UploadParrFilesCommand(file, periodYear, periodMonth, "User_POC");
+            // 1. On extrait les octets du fichier Web
+            byte[] fileBytes;
+            using (var memoryStream = new MemoryStream())
+            {
+                await file.CopyToAsync(memoryStream);
+                fileBytes = memoryStream.ToArray();
+            }
 
-            // On envoie la commande au Handler via MediatR
+            // 2. On crée la commande 
+            var command = new UploadParrFilesCommand(
+                file.FileName,
+                fileBytes,
+                periodYear,
+                periodMonth,
+                "User_POC" 
+            );
+
+            // 3. On l'envoie à la couche métier
             var result = await _mediator.Send(command);
 
             if (!result.Success)

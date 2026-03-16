@@ -1,34 +1,26 @@
-﻿using PAFA.Domain.Entities;
-using PAFA.Domain.Repositories;
-using Microsoft.EntityFrameworkCore;
-using PAFA.Infrastructure.Data;
+﻿using Microsoft.EntityFrameworkCore;
+using PAFA.Domain.Entities;
 using PAFA.Domain.IRepository;
+using PAFA.Infrastructure.Persistence;
 
-namespace PAFA.Infrastructure.Repositories
+namespace PAFA.Infrastructure.Repositories;  
+
+public class IngestionFileRepository(PafaDbContext ctx)
+ : BaseRepository<IngestionFile>(ctx), IIngestionFileRepository
 {
-    public class IngestedFileRepository : BaseRepository<IngestionFile>, IIngestionFileRepository
+    public Task<bool> ExistsAsync(string fileName, CancellationToken ct = default)
+        => _ctx.IngestionFiles.AnyAsync(f => f.FileName == fileName, ct);
+
+    public async Task AddValidationErrorsAsync(
+        Guid fileId, IEnumerable<ValidationError> errors, CancellationToken ct = default)
     {
-        public IngestedFileRepository(PafaDbContext dbContext) : base(dbContext) { }
-
-        public async Task<bool> ExistsAsync(string fileName, CancellationToken cancellationToken = default)
-        {
-            return await _dbContext.IngestionFiles.AnyAsync(x => x.FileName == fileName, cancellationToken);
-        }
-
-        public async Task AddValidationErrorsAsync(Guid fileId, IEnumerable<ValidationError> errors, CancellationToken ct = default)
-        {
-            foreach (var error in errors)
-            {
-                error.IngestionFileId = fileId;
-            }
-            await _dbContext.ValidationErrors.AddRangeAsync(errors, ct);
-        }
-
-        public async Task<IReadOnlyList<IngestionFile>> GetByJobIdAsync(Guid jobId, CancellationToken ct = default)
-        {
-            return await _dbContext.IngestionFiles
-                .Where(f => f.IngestionJobId == jobId)
-                .ToListAsync(ct);
-        }
+        foreach (var e in errors) e.IngestionFileId = fileId;
+        await _ctx.ValidationErrors.AddRangeAsync(errors, ct);
     }
+
+    public async Task<IReadOnlyList<IngestionFile>> GetByJobIdAsync(Guid jobId, CancellationToken ct = default)
+        => await _ctx.IngestionFiles
+            .Where(f => f.IngestionJobId == jobId)
+            .Include(f => f.ValidationErrors)
+            .ToListAsync(ct);
 }

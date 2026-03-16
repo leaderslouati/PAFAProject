@@ -1,26 +1,32 @@
+// ═══════════════════════════════════════════════════════════
+// PAFA.Domain/Entities/ShipperProductClass.cs
+//
+// CORRECTIONS :
+//   ✓ Hérite désormais de BaseEntity (supprime le CreatedAt
+//     en doublon qui était dans la classe)
+//   ✓ PeriodYear + PeriodMonth remplacés par DateOnly ReportingPeriod
+//     → clé composite : ShipperId + ProductClassId + ReportingPeriod
+// ═══════════════════════════════════════════════════════════
 namespace PAFA.Domain.Entities;
 
 /// <summary>
-/// Many-to-Many association table between Shipper and ProductClass.
-/// Contains monthly portfolio metrics (supply points, total AQ).
-/// Composite primary key: ShipperId + ProductClassId + PeriodYear + PeriodMonth.
+/// Many-to-many between Shipper and ProductClass.
+/// Contains monthly portfolio metrics per shipper per product class.
+/// Composite PK: ShipperId + ProductClassId + ReportingPeriod.
 /// </summary>
-public class ShipperProductClass
+public class ShipperProductClass : BaseEntity
 {
-    public Guid ShipperId      { get; set; }
-    public int  ProductClassId { get; set; }
-    public int  PeriodYear     { get; set; }
-    public int  PeriodMonth    { get; set; }
+    public Guid ShipperId { get; set; }
+    public int ProductClassId { get; set; }
+    public DateOnly ReportingPeriod { get; set; }
 
-    /// <summary>Number of supply points for this Shipper in this class for this month.</summary>
-    public int?     SupplyPointCount { get; set; }
+    /// <summary>Number of supply points for this shipper in this class.</summary>
+    public int? SupplyPointCount { get; set; }
 
-    /// <summary>Total portfolio AQ (MWH) for this month.</summary>
-    public decimal? TotalAQ_MWH     { get; set; }
+    /// <summary>Total portfolio Annual Quantity (MWH) for this month.</summary>
+    public decimal? TotalAQ_MWH { get; set; }
 
-    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-
-    // ── Navigation ──────────────────────────────────────────────────────
-    public Shipper      Shipper      { get; set; } = null!;
+    // ── Navigation ─────────────────────────────────────────────────
+    public Shipper Shipper { get; set; } = null!;
     public ProductClass ProductClass { get; set; } = null!;
 }

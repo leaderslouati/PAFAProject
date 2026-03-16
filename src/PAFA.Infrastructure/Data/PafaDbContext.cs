@@ -1,60 +1,35 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿// ════════════════════════════════════════════════════════════
+// PAFA.Infrastructure/Persistence/PafaDbContext.cs
+// ════════════════════════════════════════════════════════════
+using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
-using PAFA.Domain.Entities.ETL;
-using PAFA.Infrastructure.EntityConfigurations;
 
-namespace PAFA.Infrastructure.Data;
+namespace PAFA.Infrastructure.Persistence;
 
-/// <summary>
-/// Main DbContext for the PAFA application.
-/// Covers 4 PostgreSQL schemas: dbo, etl, security, audit.
-/// </summary>
-public class PafaDbContext : DbContext
+public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(options)
 {
-    public PafaDbContext(DbContextOptions<PafaDbContext> options) : base(options) { }
+    public DbSet<IngestionJob> IngestionJobs => Set<IngestionJob>();
+    public DbSet<IngestionFile> IngestionFiles => Set<IngestionFile>();
+    public DbSet<ValidationError> ValidationErrors => Set<ValidationError>();
+    public DbSet<MetricValue> MetricValues => Set<MetricValue>();
+    public DbSet<Shipper> Shippers => Set<Shipper>();
+    public DbSet<ProductClass> ProductClasses => Set<ProductClass>();
+    public DbSet<ShipperProductClass> ShipperProductClasses => Set<ShipperProductClass>();
+    public DbSet<ReportType> ReportTypes => Set<ReportType>();
+    public DbSet<Report> Reports => Set<Report>();
 
-    // ── Schema DBO — Business Entities ──────────────────────────────────
-    public DbSet<Shipper>               Shippers              { get; set; }
-    public DbSet<ProductClass>          ProductClasses        { get; set; }
-    public DbSet<ShipperProductClass>   ShipperProductClasses { get; set; }
-    public DbSet<ReportType>            ReportTypes           { get; set; }
-    public DbSet<Report>                Reports               { get; set; }
-    public DbSet <MetricValue>           MetricValues          { get; set; }
-
-    // ── Schema ETL — Ingestion Pipeline ─────────────────────────────────
-    public DbSet<IngestionJob>    IngestionJobs    { get; set; }
-    public DbSet<IngestionFile>   IngestionFiles   { get; set; }
-    public DbSet<ValidationError> ValidationErrors { get; set; }
-
-
-
-    protected override void OnModelCreating(ModelBuilder modelBuilder)
+    protected override void OnModelCreating(ModelBuilder mb)
     {
-        base.OnModelCreating(modelBuilder);
+        mb.ApplyConfigurationsFromAssembly(typeof(PafaDbContext).Assembly);
 
-        // Apply all configurations from the same assembly
-        modelBuilder.ApplyConfigurationsFromAssembly(
-            typeof(ShipperConfiguration).Assembly
-        );
-
-        // Create PostgreSQL schemas
-        modelBuilder.HasDefaultSchema("public");
-    }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        if (!optionsBuilder.IsConfigured)
+        // Convention globale : CreatedAt → valeur SQL par défaut (stable, non-dynamique)
+        foreach (var entity in mb.Model.GetEntityTypes())
         {
-            // Fallback for CLI tools (migrations)
-            optionsBuilder.UseNpgsql(
-                "Host=localhost;Database=PAFA_POC;Username=postgres;Password=yourpassword;",
-                sql =>
-                {
-                    sql.MigrationsHistoryTable("__EFMigrationsHistory", "public");
-                    sql.EnableRetryOnFailure(3);
-                    sql.CommandTimeout(120);
-                }
-            );
+            var prop = entity.FindProperty("CreatedAt");
+            if (prop != null && prop.ClrType == typeof(DateTime))
+                prop.SetDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
         }
+
+        base.OnModelCreating(mb);
     }
 }

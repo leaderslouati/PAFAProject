@@ -1,118 +1,169 @@
-﻿using System;
-using MediatR;
+﻿using MediatR;
+using Microsoft.Extensions.Logging;
 using PAFA.Domain.Entities;
-using PAFA.Domain.Entities.ETL;
 using PAFA.Domain.Enums;
 using PAFA.Domain.Repositories;
-using PAFA.Extraction.Commands.Import;
+using PAFA.Extraction.Mapping;
+using PAFA.Extraction.Validation;
+using PAFA.Infrastructure.Parsing;
 
-namespace PAFA.Extraction.Handlers.ImportFile
+namespace PAFA.Extraction.Commands.Import;
+
+public  class UploadParrFilesCommandHandler
+    : IRequestHandler<UploadParrFilesCommand, UploadParrFilesResult>
 {
-    public class UploadParrFilesHandler : IRequestHandler<UploadParrFilesCommand, UploadParrFilesResult>
+    private readonly IUnitOfWork _uow;
+    private readonly FileParserFactory _factory;
+    private readonly ILogger<UploadParrFilesCommandHandler> _log;
+
+    public UploadParrFilesCommandHandler(
+        IUnitOfWork uow, FileParserFactory factory,
+        ILogger<UploadParrFilesCommandHandler> log)
+    { _uow = uow; _factory = factory; _log = log; }
+
+    public async Task<UploadParrFilesResult> Handle(
+        UploadParrFilesCommand cmd, CancellationToken ct)
     {
-        private readonly IMediator _mediator;
-        private readonly IUnitOfWork _unitOfWork;
+        _log.LogInformation("Import démarré — {File}", cmd.FileName);
+        var period = new DateOnly(cmd.PeriodYear, cmd.PeriodMonth, 1);
 
-        public UploadParrFilesHandler(IMediator mediator, IUnitOfWork unitOfWork)
+        // ── 1. Créer IngestionJob + IngestionFile ─────────────────
+        var job = new IngestionJob
         {
-            _mediator = mediator;
-            _unitOfWork = unitOfWork;
-        }
+            JobName = $"PARR_{cmd.PeriodYear}_{cmd.PeriodMonth:D2}",
+            ReportingPeriod = period,
+            Status = IngestionJobStatus.Processing,
+            FilesExpected = 1,
+            StartedAt = DateTime.UtcNow,
+            TriggeredBy = JobTrigger.Manual
+        };
+        await _uow.IngestionJobs.AddAsync(job, ct);
 
-        public async Task<UploadParrFilesResult> Handle(UploadParrFilesCommand request, CancellationToken cancellationToken)
+        var file = new IngestionFile
         {
-            // 1. Définir le chemin de sauvegarde local (dossier temporaire du serveur)
-            var fileName = request.File.FileName;
-            var filePath = Path.Combine(Path.GetTempPath(), fileName);
+            IngestionJobId = job.Id,
+            FileName = cmd.FileName,
+            SourceSystem = cmd.SourceSystem,
+            FileSizeBytes = cmd.FileContent.Length,
+            Status = IngestionFileStatus.Validating,
+            ValidationStatus = ValidationStatus.Pending,
+            DownloadedAt = DateTime.UtcNow
+        };
+        await _uow.IngestionFiles.AddAsync(file, ct);
+        await _uow.SaveChangesAsync(ct);
 
-            // 2. Sauvegarder le fichier physiquement
-            using (var stream = new FileStream(filePath, FileMode.Create))
+        try
+        {
+            // ── 2. Parser ─────────────────────────────────────────
+            var parser = _factory.GetParser(cmd.FileName);
+            using var ms = new MemoryStream(cmd.FileContent);
+            var parsed = await parser.ParseAsync(ms, cmd.FileName, ct);
+
+            if (!parsed.Success)
+                return await Fail(job, file, parsed.ErrorMessage ?? "Erreur parsing", 0, 0, 0, ct);
+
+            // ── 3. Valider ────────────────────────────────────────
+            var knownCodes = (await _uow.Shippers.GetActiveShippersAsync(ct))
+                .Select(s => s.ShortCode).ToHashSet();
+            var validator = new ImportValidationService(knownCodes);
+            var validation = validator.Validate(parsed, cmd.FileName, isAnonymised: false);
+
+            // ── 4. Persister les erreurs (US_0a) ──────────────────
+            if (validation.Findings.Any())
             {
-                await request.File.CopyToAsync(stream, cancellationToken);
+                var errors = validation.Findings.Select(f => new ValidationError
+                {
+                    IngestionFileId = file.Id,
+                    LineNumber = f.RowNumber > 0 ? f.RowNumber : null,
+                    ColumnName = f.FieldName,
+                    ErrorCode = f.RuleId,
+                    ErrorMessage = f.ErrorMessage,
+                    OriginalValue = f.FieldValue,
+                    Severity = f.Severity.ToString().ToUpperInvariant()
+                }).ToList();
+                await _uow.IngestionFiles.AddValidationErrorsAsync(file.Id, errors, ct);
             }
 
-            // 3. Générer les IDs pour la traçabilité
-            var jobId = Guid.NewGuid();
-            var fileId = Guid.NewGuid();
-
-            // Créer l'enregistrement IngestionJob
-            var job = new IngestionJob
+            // ── 5. Erreurs bloquantes → réponse echec ─────────────
+            if (validation.HasBlockingErrors)
             {
-                Id = jobId,
-                JobName = $"PARR_{request.PeriodYear}_{request.PeriodMonth:D2}",
-                PeriodYear = request.PeriodYear,
-                PeriodMonth = request.PeriodMonth,
-                Status = IngestionJobStatus.Started,
-                StartedAt = DateTime.UtcNow,
-                TriggeredBy = JobTrigger.Manual,
-                CreatedBy = request.UploadedBy
-            };
-            await _unitOfWork.IngestionJobs.AddAsync(job);
-
-            // Créer l'enregistrement IngestionFile
-            var file = new IngestionFile
-            {
-                Id = fileId,
-                IngestionJobId = jobId,
-                FileName = fileName,
-                FileType = FileType.Xlsx,
-                Status = IngestionFileStatus.Downloaded,
-                BlobPath = filePath,
-                CreatedBy = request.UploadedBy
-            };
-            await _unitOfWork.IngestionFiles.AddAsync(file);
-            await _unitOfWork.SaveChangesAsync();
-
-            // 4. DÉCLENCHEMENT SYNCHRONE DE LA PHASE 2 (Le Parsing)
-            var parseCommand = new ParseAndValidateFileCommand(
-                jobId,
-                fileId,
-                fileName,
-                filePath,
-                request.PeriodYear,
-                request.PeriodMonth
-            );
-
-            // On attend que le fichier soit lu et inséré en base par ParseAndValidateFileHandler
-            var parseResult = await _mediator.Send(parseCommand, cancellationToken);
-
-            // 5. Retour du résultat à l'API avec les statistiques de lecture !
-            if (!parseResult.Success)
-            {
-                return new UploadParrFilesResult(
-                    false,
-                    jobId,
-                    fileId,
-                    fileName,
-                    parseResult.RowsRead,
-                    parseResult.RowsValid,
-                    parseResult.RowsRejected,
-                    parseResult.ErrorMessage);
+                var summary = string.Join("; ",
+                    validation.Findings
+                        .Where(f => f.Severity == ValidationSeverity.Error)
+                        .Take(5).Select(f => f.ErrorMessage));
+                return await Fail(job, file, summary,
+                    parsed.TotalRows, validation.ValidRowCount, validation.InvalidRowCount, ct);
             }
 
-            file.Status = parseResult.Success 
-                ? IngestionFileStatus.Loaded 
-                : IngestionFileStatus.Failed;
-            file.RowsRead = parseResult.RowsRead;
-            file.RowsValid = parseResult.RowsValid;
-            file.RowsRejected = parseResult.RowsRejected;
+            // ── 6. Mapper → MetricValues (EAV) ───────────────────
+            var badRows = validation.Findings
+                .Where(f => f.Severity == ValidationSeverity.Error && f.RowNumber > 0)
+                .Select(f => f.RowNumber).ToHashSet();
 
-            job.Status = parseResult.Success 
-                ? IngestionJobStatus.Completed 
-                : IngestionJobStatus.Failed;
+            var metrics = new List<MetricValue>();
+            foreach (var row in parsed.Rows)
+            {
+                if (badRows.Contains(row.RowNumber)) continue;
+
+                // Une ligne Excel → N MetricValues (une par colonne numérique)
+                metrics.AddRange(MetricValueMapper.MapToMetricValues(
+                    row, file.Id, period, cmd.UploadedBy));
+            }
+
+            if (metrics.Any())
+                await _uow.MetricValues.AddRangeAsync(metrics, ct);
+
+            // ── 7. Mettre à jour les statuts ──────────────────────
+            file.Status = IngestionFileStatus.Loaded;
+            file.ValidationStatus = validation.Findings.Any(f => f.Severity == ValidationSeverity.Warning)
+                ? ValidationStatus.PassedWithWarnings : ValidationStatus.Passed;
+            file.RowsRead = parsed.TotalRows;
+            file.RowsValid = validation.ValidRowCount;
+            file.RowsRejected = validation.InvalidRowCount;
+            file.ProcessedAt = DateTime.UtcNow;
+            _uow.IngestionFiles.Update(file);
+
+            job.Status = IngestionJobStatus.Completed;
+            job.FilesProcessed = 1;
+            job.RecordsLoaded = metrics.Count;
             job.CompletedAt = DateTime.UtcNow;
+            _uow.IngestionJobs.Update(job);
 
-            await _unitOfWork.SaveChangesAsync();
+            await _uow.SaveChangesAsync(ct);
+
+            _log.LogInformation("Import OK — {Rows} lignes Excel, {Metrics} métriques insérées",
+                validation.ValidRowCount, metrics.Count);
 
             return new UploadParrFilesResult(
-                true,
-                jobId,
-                fileId,
-                fileName,
-                parseResult.RowsRead,
-                parseResult.RowsValid,
-                parseResult.RowsRejected,
-                null);
+                Success: true,
+                JobId: job.Id,
+                FileId: file.Id,
+                FileName: cmd.FileName,
+                RowsRead: parsed.TotalRows,
+                RowsValid: validation.ValidRowCount,
+                RowsRejected: validation.InvalidRowCount,
+                ErrorMessage: null);
         }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "Erreur inattendue — {File}", cmd.FileName);
+            return await Fail(job, file, ex.Message, 0, 0, 0, ct);
+        }
+    }
+
+    async Task<UploadParrFilesResult> Fail(
+        IngestionJob job, IngestionFile file, string err,
+        int total, int valid, int rejected, CancellationToken ct)
+    {
+        file.Status = IngestionFileStatus.Failed;
+        file.ValidationStatus = ValidationStatus.Failed;
+        file.RowsRead = total; file.RowsValid = valid; file.RowsRejected = rejected;
+        _uow.IngestionFiles.Update(file);
+        job.Status = IngestionJobStatus.Failed;
+        job.ErrorSummary = err; job.CompletedAt = DateTime.UtcNow;
+        _uow.IngestionJobs.Update(job);
+        await _uow.SaveChangesAsync(ct);
+        return new UploadParrFilesResult(false, job.Id, file.Id,
+            file.FileName, total, valid, rejected, err);
     }
 }
