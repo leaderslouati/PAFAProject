@@ -21,27 +21,41 @@ services:
       timeout: 5s
       retries: 5
 
-  # 2. Votre première brique métier (Commentée pour l'instant)
-  # Une fois que vous aurez créé le Dockerfile pour src/PAFA.Api, 
-  # vous pourrez décommenter ce bloc.
-  # pafa-api:
-  #   build:
-  #     dockerfile: ./src/PAFA.Api/Dockerfile
-  #     context: .
-  #   image: pafa-api:latest
-  #   ports:
-  #     - "5000:8080"
-  #   environment:
-  #     - ASPNETCORE_ENVIRONMENT=Development
-  #     - ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=pafadb;Username=postgres;Password=postgres
-  #     - RabbitMq__Host=rabbitmq
-  #     - RabbitMq__Username=guest
-  #     - RabbitMq__Password=guest
-  #   depends_on:
-  #     db:
-  #       condition: service_healthy
-  #     rabbitmq:
-  #       condition: service_healthy
+  # 2. Service SFTP pour les rapports
+  pafa-sftp:
+    image: atmoz/sftp
+    container_name: pafa_sftp
+    ports:
+      - "2222:22"
+    volumes:
+      - ./sftp-data/upload:/home/xoserve/upload
+      - ./sftp-data/processed:/home/xoserve/processed
+    command: xoserve:xoserve_pass:1001
+    networks:
+      default:
+        aliases:
+          - pafa_sftp
+
+  # 3. Service pour les rapports par lots
+  pafa-batch-reports:
+    build:
+      context: .
+      dockerfile: src/PAFA.BatchReports/Dockerfile
+    image: pafa-batch-reports:latest
+    container_name: pafa_batch_reports
+    environment:
+      - DOTNET_ENVIRONMENT=Production
+      - PAFA_ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=pafadb;Username=postgres;Password=postgres
+      - PAFA_BatchReports__OutputDirectory=/app/output/reports
+      - PAFA_BatchReports__TempDirectory=/app/output/reports/temp
+    volumes:
+      - pafa_reports_data:/app/output/reports
+    depends_on:
+      db:
+        condition: service_healthy
+
+volumes:
+  pafa_reports_data:
 
 networks:
   default:
