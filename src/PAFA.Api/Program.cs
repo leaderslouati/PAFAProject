@@ -1,6 +1,6 @@
-﻿using MassTransit;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.OpenApi.Models;
+using PAFA.Domain.Interfaces;
 using PAFA.Domain.IRepository;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
@@ -9,6 +9,8 @@ using PAFA.Infrastructure.Parsing;
 using PAFA.Infrastructure.Persistence;
 using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
+using PAFA.Infrastructure.Sftp;
+using PAFA.Infrastructure.Storage;
 using PAFA.Reports.Handlers;
 using PAFA.Reports.Writers;
 using System.Text.Json.Serialization;
@@ -25,14 +27,13 @@ builder.Services.AddControllers()
         o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
 
 builder.Services.AddEndpointsApiExplorer();
-
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo
     {
         Title       = "PAFA Import API",
         Version     = "v1.0",
-        Description = "API for PARR file ingestion and processing pipeline",
+        Description = "API for PARR file ingestion, dashboard and export endpoints",
         Contact     = new OpenApiContact { Name = "PAFA Team", Email = "pafa-support@company.com" }
     });
 
@@ -46,7 +47,7 @@ builder.Services.AddSwaggerGen(c =>
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  DATABASE CONFIGURATION
+//  DATABASE
 // ═══════════════════════════════════════════════════════════════════════
 
 builder.Services.AddDbContext<PafaDbContext>(options =>
@@ -55,27 +56,47 @@ builder.Services.AddDbContext<PafaDbContext>(options =>
         npgsql => npgsql.EnableRetryOnFailure(3)));
 
 // ═══════════════════════════════════════════════════════════════════════
-//  REPOSITORY PATTERN & UNIT OF WORK
+//  REPOSITORIES
 // ═══════════════════════════════════════════════════════════════════════
 
-builder.Services.AddScoped<IUnitOfWork,             UnitOfWork>();
-builder.Services.AddScoped<IIngestionJobRepository, IngestionJobRepository>();
+builder.Services.AddScoped<IUnitOfWork,              UnitOfWork>();
+builder.Services.AddScoped<IIngestionJobRepository,  IngestionJobRepository>();
 builder.Services.AddScoped<IIngestionFileRepository, IngestionFileRepository>();
-builder.Services.AddScoped<IShipperRepository,      ShipperRepository>();
-builder.Services.AddScoped<IReportRepository,       ReportRepository>();
-builder.Services.AddScoped<IMetricValueRepository,  MetricValueRepository>();
+builder.Services.AddScoped<IShipperRepository,       ShipperRepository>();
+builder.Services.AddScoped<IReportRepository,        ReportRepository>();
+builder.Services.AddScoped<IMetricValueRepository,   MetricValueRepository>();
 
 // ═══════════════════════════════════════════════════════════════════════
-//  FILE PARSING (Excel → MetricValues)
+//  SFTP — kept for manual import via SftpController (Swagger)
 // ═══════════════════════════════════════════════════════════════════════
 
+builder.Services.Configure<SftpSettings>(
+    builder.Configuration.GetSection(SftpSettings.SectionName));
+builder.Services.AddScoped<ISftpFileSource, SftpFileDownloader>();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BLOB STORAGE
+// ═══════════════════════════════════════════════════════════════════════
+
+builder.Services.Configure<BlobStorageSettings>(
+    builder.Configuration.GetSection(BlobStorageSettings.SectionName));
+
+var blobProvider = builder.Configuration["BlobStorage:Provider"] ?? "Local";
+if (blobProvider.Equals("MinIO", StringComparison.OrdinalIgnoreCase))
+    builder.Services.AddSingleton<IBlobStorageService, MinioBlobStorageService>();
+else
+    builder.Services.AddSingleton<IBlobStorageService, LocalBlobStorageService>();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FILE PARSING
+// ═══════════════════════════════════════════════════════════════════════
 
 builder.Services.AddScoped<IFileParser, ExcelFileParser>();
 builder.Services.AddScoped<IFileParser, CsvFileParser>();
 builder.Services.AddScoped<FileParserFactory>();
 
 // ═══════════════════════════════════════════════════════════════════════
-//  REPORT WRITERS (Strategy Pattern pour CSV, Excel et PDF export)
+//  REPORT WRITERS
 // ═══════════════════════════════════════════════════════════════════════
 
 builder.Services.AddScoped<IReportWriter, CsvReportWriter>();
@@ -93,25 +114,13 @@ builder.Services.AddMediatR(cfg =>
 });
 
 // ═══════════════════════════════════════════════════════════════════════
-//  RABBITMQ & MASSTRANSIT (ASYNC MESSAGING)
+//  SIGNALR
 // ═══════════════════════════════════════════════════════════════════════
 
-builder.Services.AddMassTransit(x =>
-{
-    x.UsingRabbitMq((context, cfg) =>
-    {
-        cfg.Host(builder.Configuration["RabbitMq:Host"] ?? "localhost", "/", h =>
-        {
-            h.Username(builder.Configuration["RabbitMq:Username"] ?? "guest");
-            h.Password(builder.Configuration["RabbitMq:Password"] ?? "guest");
-        });
-
-        cfg.ConfigureEndpoints(context);
-    });
-});
+builder.Services.AddSignalR();
 
 // ═══════════════════════════════════════════════════════════════════════
-//  CORS (FOR FRONTEND DEVELOPMENT)
+//  CORS
 // ═══════════════════════════════════════════════════════════════════════
 
 builder.Services.AddCors(options =>
@@ -153,12 +162,15 @@ app.UseCors("AllowFrontend");
 app.UseAuthorization();
 app.MapControllers();
 
+// SignalR hub endpoint
+app.MapHub<PAFA.Api.Hubs.IngestionHub>("/hubs/ingestion");
+
 // ═══════════════════════════════════════════════════════════════════════
 //  STARTUP LOGGING
 // ═══════════════════════════════════════════════════════════════════════
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("PAFA Import API started successfully");
-logger.LogInformation("Environment: {Env}", app.Environment.EnvironmentName);
+logger.LogInformation("PAFA API started — Blob: {Provider}", blobProvider);
+logger.LogInformation("Ingestion: via PAFA.BatchReports CronJob or POST /api/sftp/ingest");
 
 app.Run();

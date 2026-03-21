@@ -10,7 +10,13 @@ namespace PAFA.Api.Controllers
     {
         private readonly IMediator _mediator = mediator;
 
+        /// <summary>
+        /// GET /api/dashboard/summary?year=2025&amp;month=2
+        /// Retourne un résumé du dashboard : nombre de shippers, conformité PC1, moyenne Read Performance.
+        /// Si year/month non fournis, calcule sur toutes les données disponibles.
+        /// </summary>
         [HttpGet("summary")]
+        [ProducesResponseType(typeof(PAFA.Extraction.Commands.Export.DashboardSummaryDto), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetSummary([FromQuery] int? year, [FromQuery] int? month)
         {
             var result = await _mediator.Send(new GetDashboardSummaryQuery(year, month));

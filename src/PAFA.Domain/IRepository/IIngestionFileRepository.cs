@@ -22,4 +22,9 @@ public interface IIngestionFileRepository : IBaseRepository<IngestionFile>
     /// Get ingestion files for a specific job.
     /// </summary>
     Task<IReadOnlyList<IngestionFile>> GetByJobIdAsync(Guid jobId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Get all validation errors for a specific file.
+    /// </summary>
+    Task<IReadOnlyList<ValidationError>> GetValidationErrorsAsync(Guid fileId, CancellationToken ct = default);
 }

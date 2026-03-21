@@ -30,14 +30,11 @@ namespace PAFA.Infrastructure.Migrations
                         .HasDefaultValueSql("gen_random_uuid()");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<Guid>("IngestionFileId")
                         .HasColumnType("uuid");
@@ -50,12 +47,15 @@ namespace PAFA.Infrastructure.Migrations
                         .HasMaxLength(60)
                         .HasColumnType("character varying(60)");
 
+                    b.Property<string>("ProductClassCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)")
+                        .HasColumnName("product_class_code");
+
                     b.Property<DateOnly>("ReportingPeriod")
                         .HasColumnType("date");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
                     b.Property<Guid?>("ShipperId")
@@ -65,6 +65,9 @@ namespace PAFA.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("character varying(10)");
+
+                    b.Property<string>("TextValue")
+                        .HasColumnType("text");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -79,6 +82,9 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.HasIndex("MetricKey")
                         .HasDatabaseName("ix_mv_metric_key");
+
+                    b.HasIndex("ProductClassCode")
+                        .HasDatabaseName("ix_mv_product_class");
 
                     b.HasIndex("ReportingPeriod")
                         .HasDatabaseName("ix_mv_period");
@@ -98,6 +104,273 @@ namespace PAFA.Infrastructure.Migrations
                     b.ToTable("metric_values", (string)null);
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.DimCalendar", b =>
+                {
+                    b.Property<string>("ReportMonth")
+                        .HasMaxLength(7)
+                        .HasColumnType("character varying(7)")
+                        .HasColumnName("report_month");
+
+                    b.Property<string>("MonthLabel")
+                        .IsRequired()
+                        .HasMaxLength(30)
+                        .HasColumnType("character varying(30)")
+                        .HasColumnName("month_label");
+
+                    b.Property<int>("MonthNum")
+                        .HasColumnType("integer")
+                        .HasColumnName("month_num");
+
+                    b.Property<string>("Quarter")
+                        .IsRequired()
+                        .HasMaxLength(2)
+                        .HasColumnType("character varying(2)")
+                        .HasColumnName("quarter");
+
+                    b.Property<int>("Year")
+                        .HasColumnType("integer")
+                        .HasColumnName("year");
+
+                    b.HasKey("ReportMonth");
+
+                    b.ToTable("dim_calendar", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            ReportMonth = "2024-01",
+                            MonthLabel = "January 2024",
+                            MonthNum = 1,
+                            Quarter = "Q1",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-02",
+                            MonthLabel = "February 2024",
+                            MonthNum = 2,
+                            Quarter = "Q1",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-03",
+                            MonthLabel = "March 2024",
+                            MonthNum = 3,
+                            Quarter = "Q1",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-04",
+                            MonthLabel = "April 2024",
+                            MonthNum = 4,
+                            Quarter = "Q2",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-05",
+                            MonthLabel = "May 2024",
+                            MonthNum = 5,
+                            Quarter = "Q2",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-06",
+                            MonthLabel = "June 2024",
+                            MonthNum = 6,
+                            Quarter = "Q2",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-07",
+                            MonthLabel = "July 2024",
+                            MonthNum = 7,
+                            Quarter = "Q3",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-08",
+                            MonthLabel = "August 2024",
+                            MonthNum = 8,
+                            Quarter = "Q3",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-09",
+                            MonthLabel = "September 2024",
+                            MonthNum = 9,
+                            Quarter = "Q3",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-10",
+                            MonthLabel = "October 2024",
+                            MonthNum = 10,
+                            Quarter = "Q4",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-11",
+                            MonthLabel = "November 2024",
+                            MonthNum = 11,
+                            Quarter = "Q4",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2024-12",
+                            MonthLabel = "December 2024",
+                            MonthNum = 12,
+                            Quarter = "Q4",
+                            Year = 2024
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-01",
+                            MonthLabel = "January 2025",
+                            MonthNum = 1,
+                            Quarter = "Q1",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-02",
+                            MonthLabel = "February 2025",
+                            MonthNum = 2,
+                            Quarter = "Q1",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-03",
+                            MonthLabel = "March 2025",
+                            MonthNum = 3,
+                            Quarter = "Q1",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-04",
+                            MonthLabel = "April 2025",
+                            MonthNum = 4,
+                            Quarter = "Q2",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-05",
+                            MonthLabel = "May 2025",
+                            MonthNum = 5,
+                            Quarter = "Q2",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-06",
+                            MonthLabel = "June 2025",
+                            MonthNum = 6,
+                            Quarter = "Q2",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-07",
+                            MonthLabel = "July 2025",
+                            MonthNum = 7,
+                            Quarter = "Q3",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-08",
+                            MonthLabel = "August 2025",
+                            MonthNum = 8,
+                            Quarter = "Q3",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-09",
+                            MonthLabel = "September 2025",
+                            MonthNum = 9,
+                            Quarter = "Q3",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-10",
+                            MonthLabel = "October 2025",
+                            MonthNum = 10,
+                            Quarter = "Q4",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-11",
+                            MonthLabel = "November 2025",
+                            MonthNum = 11,
+                            Quarter = "Q4",
+                            Year = 2025
+                        },
+                        new
+                        {
+                            ReportMonth = "2025-12",
+                            MonthLabel = "December 2025",
+                            MonthNum = 12,
+                            Quarter = "Q4",
+                            Year = 2025
+                        });
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.FactReadPerformance", b =>
+                {
+                    b.Property<decimal?>("CheckReadCount")
+                        .HasColumnType("numeric")
+                        .HasColumnName("check_read_count");
+
+                    b.Property<decimal?>("EstimatedPct")
+                        .HasColumnType("numeric")
+                        .HasColumnName("estimated_pct");
+
+                    b.Property<bool>("IsCompliant")
+                        .HasColumnType("boolean")
+                        .HasColumnName("is_compliant");
+
+                    b.Property<string>("ProductClass")
+                        .HasColumnType("text")
+                        .HasColumnName("product_class");
+
+                    b.Property<decimal?>("ReadPerfPct")
+                        .HasColumnType("numeric")
+                        .HasColumnName("read_perf_pct");
+
+                    b.Property<string>("ReportMonth")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("report_month");
+
+                    b.Property<string>("ShipperCode")
+                        .IsRequired()
+                        .HasColumnType("text")
+                        .HasColumnName("shipper_code");
+
+                    b.Property<decimal?>("TotalSites")
+                        .HasColumnType("numeric")
+                        .HasColumnName("total_sites");
+
+                    b.ToTable((string)null);
+
+                    b.ToView("fact_read_performance", (string)null);
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.IngestionFile", b =>
                 {
                     b.Property<Guid>("Id")
@@ -110,9 +383,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("character varying(1000)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -209,9 +480,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -309,9 +578,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -416,9 +683,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("character varying(5000)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -508,9 +773,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("character varying(10)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -596,9 +859,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("date");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -646,9 +907,7 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("character varying(100)");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
@@ -707,32 +966,31 @@ namespace PAFA.Infrastructure.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("timestamp with time zone")
-                        .HasDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
+                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.Property<string>("Email")
-                        .HasMaxLength(255)
-                        .HasColumnType("character varying(255)");
+                        .HasColumnType("text");
 
                     b.Property<bool>("IsActive")
-                        .HasColumnType("boolean");
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<string>("LegalEntity")
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("legal_entity");
 
                     b.Property<DateOnly?>("MarketEntryDate")
                         .HasColumnType("date");
@@ -742,38 +1000,125 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("character varying(200)");
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
 
                     b.Property<int?>("PortfolioSize")
                         .HasColumnType("integer");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bytea")
-                        .HasDefaultValueSql("decode('', 'hex')");
+                        .HasColumnType("bytea");
 
                     b.Property<string>("ShortCode")
                         .IsRequired()
-                        .HasMaxLength(3)
-                        .HasColumnType("character(3)")
-                        .IsFixedLength();
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("short_code");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("ShortCode")
                         .IsUnique()
-                        .HasDatabaseName("ix_shipper_ssc");
+                        .HasDatabaseName("ix_shipper_short_code");
 
                     b.ToTable("shippers", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000001"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Alpha Gas Limited",
+                            Name = "Alpha Gas Ltd",
+                            ShortCode = "SHIP_A"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000002"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Beta Energy PLC",
+                            Name = "Beta Energy plc",
+                            ShortCode = "SHIP_B"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000003"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Gamma Supply Limited",
+                            Name = "Gamma Supply Ltd",
+                            ShortCode = "SHIP_C"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000004"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Delta Gas Company",
+                            Name = "Delta Gas Co",
+                            ShortCode = "SHIP_D"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000005"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Epsilon Energy Ltd",
+                            Name = "Epsilon Energy",
+                            ShortCode = "SHIP_E"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000006"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Zeta Gas Limited",
+                            Name = "Zeta Gas Ltd",
+                            ShortCode = "SHIP_F"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000007"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Eta Supply PLC",
+                            Name = "Eta Supply plc",
+                            ShortCode = "SHIP_G"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000008"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Theta Gas Corporation",
+                            Name = "Theta Gas Corp",
+                            ShortCode = "SHIP_H"
+                        });
                 });
 
             modelBuilder.Entity("MetricValue", b =>

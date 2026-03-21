@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using DocumentFormat.OpenXml.InkML;
+using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
 using PAFA.Domain.IRepository;
 using PAFA.Infrastructure.Persistence;
@@ -23,4 +24,10 @@ public class IngestionFileRepository(PafaDbContext ctx)
             .Where(f => f.IngestionJobId == jobId)
             .Include(f => f.ValidationErrors)
             .ToListAsync(ct);
+    public async Task<IReadOnlyList<ValidationError>> GetValidationErrorsAsync(
+    Guid fileId, CancellationToken ct = default)
+    => await _ctx.ValidationErrors
+        .Where(e => e.IngestionFileId == fileId)
+        .OrderBy(e => e.LineNumber)
+        .ToListAsync(ct);
 }

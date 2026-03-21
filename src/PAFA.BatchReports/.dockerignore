@@ -1,0 +1,36 @@
+# Docker ignore file for PAFA Batch Reports
+
+# Build outputs
+**/bin/
+**/obj/
+**/publish/
+**/output/
+
+# IDE files
+**/.vs/
+**/.vscode/
+**/.idea/
+*.user
+*.suo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Documentation
+*.md
+!README.md
+
+# Test files
+test-data/
+*.ps1
+*.sh
+
+# Temp files
+*.tmp
+*.log

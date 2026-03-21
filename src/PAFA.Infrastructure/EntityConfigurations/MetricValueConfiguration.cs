@@ -17,8 +17,9 @@ public class MetricValueConfiguration : IEntityTypeConfiguration<MetricValue>
         b.Property(x => x.ShipperShortCode).IsRequired().HasMaxLength(10);
         b.Property(x => x.MetricKey).IsRequired().HasMaxLength(60);
         b.Property(x => x.Value).HasColumnType("numeric(12,4)");
-        b.Property(x => x.CreatedBy).HasMaxLength(100);
-        b.Property(x => x.RowVersion).IsRowVersion().IsRequired(false);
+        b.Property(x => x.ProductClassCode)
+                .HasColumnName("product_class_code")
+                .HasMaxLength(10);
 
         // ── Contrainte unicité : évite les doublons à l'import ──────
         // Un seul enregistrement par shipper / période / métrique / fichier
@@ -37,7 +38,9 @@ public class MetricValueConfiguration : IEntityTypeConfiguration<MetricValue>
         b.HasIndex(x => x.MetricKey).HasDatabaseName("ix_mv_metric_key");
         b.HasIndex(x => new { x.ReportingPeriod, x.MetricKey })
             .HasDatabaseName("ix_mv_period_key");
-
+        // ← NOUVEAU index pour filtrage Power BI
+        b.HasIndex(x => x.ProductClassCode)
+               .HasDatabaseName("ix_mv_product_class");
         // ── Relation FK → IngestionFile ─────────────────────────────
         b.HasOne(x => x.IngestionFile)
             .WithMany(x => x.MetricValues)

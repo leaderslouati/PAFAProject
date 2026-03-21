@@ -1,0 +1,167 @@
+﻿# =============================================================================
+# PAFA Data Ingestion — Kubernetes CronJob
+#
+# Responsabilité UNIQUE : récupérer les fichiers Xoserve du SFTP
+#   SFTP Download → MinIO Upload → Parse → Validate → Insert DB
+#   C'est le "Data Ingestion Service" du diagramme d'architecture.
+#   Les rapports sont générés séparément (Report Generation Service).
+#
+# ─── LOCAL (Docker Desktop Kubernetes) ────────────────────────────────────────
+#   1. Builder l'image :
+#        docker build -t pafa-batch:local -f src/PAFA.BatchReports/Dockerfile .
+#
+#   2. Déployer le CronJob :
+#        kubectl apply -f src/PAFA.BatchReports/cronjob-local.yaml
+#
+#   3. Lancer manuellement (ne pas attendre le 1er du mois) :
+#        kubectl create job pafa-test-run-01 --from=cronjob/pafa-ingestion-cronjob
+#
+#   4. Voir les logs :
+#        kubectl logs -f job/pafa-test-run-01
+#
+#   5. Nettoyer :
+#        kubectl delete job pafa-test-run-01
+#        kubectl delete cronjob pafa-ingestion-cronjob
+#
+# ─── PRODUCTION (AKS) ────────────────────────────────────────────────────────
+#   kubectl apply -f src/PAFA.BatchReports/kubernetes-cronjob.yaml
+#   kubectl create job pafa-manual-$(date +%s) \
+#     --from=cronjob/pafa-ingestion-cronjob --namespace pafa
+# =============================================================================
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: pafa
+  labels:
+    app: pafa
+
+---
+# Secret — créer une seule fois avant le premier deploy :
+#
+#   kubectl create secret generic pafa-secrets -n pafa \
+#     --from-literal=db-connection="Host=postgres.pafa.svc.cluster.local;Port=5432;Database=pafadb;Username=pafa_user;Password=CHANGE_ME" \
+#     --from-literal=sftp-password="xoserve_prod_password" \
+#     --from-literal=minio-access-key="CHANGE_ME" \
+#     --from-literal=minio-secret-key="CHANGE_ME"
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pafa-ingestion-cronjob
+  namespace: pafa
+  labels:
+    app: pafa-batch
+    component: data-ingestion
+spec:
+  # 1er du mois à 02:00 UTC — Xoserve publie les fichiers en début de mois
+  schedule: "0 2 1 * *"
+  timeZone: "UTC"
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  startingDeadlineSeconds: 7200
+
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: pafa-batch
+            component: data-ingestion
+        spec:
+          restartPolicy: OnFailure
+
+          containers:
+          - name: pafa-batch
+            image: your-registry.azurecr.io/pafa-batch:latest
+            imagePullPolicy: Always
+
+            # ── INGESTION UNIQUEMENT (pas de reports) ──
+            args: ["--ingest"]
+
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "1Gi"
+                cpu: "1000m"
+
+            env:
+            - name: DOTNET_ENVIRONMENT
+              value: "Production"
+
+            # Période (optionnel — si absent, auto = mois précédent)
+            - name: PAFA_TargetYear
+              valueFrom:
+                configMapKeyRef:
+                  name: pafa-period-config
+                  key: target-year
+                  optional: true
+            - name: PAFA_TargetMonth
+              valueFrom:
+                configMapKeyRef:
+                  name: pafa-period-config
+                  key: target-month
+                  optional: true
+
+            # Database
+            - name: PAFA_ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: db-connection
+
+            # SFTP (Xoserve)
+            - name: PAFA_Sftp__Host
+              value: "sftp.xoserve.com"
+            - name: PAFA_Sftp__Port
+              value: "22"
+            - name: PAFA_Sftp__Username
+              value: "pafa_service"
+            - name: PAFA_Sftp__Password
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: sftp-password
+            - name: PAFA_Sftp__RemotePath
+              value: "/upload"
+            - name: PAFA_Sftp__ProcessedPath
+              value: "/processed"
+            - name: PAFA_Sftp__FailedPath
+              value: "/failed"
+
+            # Blob Storage (MinIO / Azure Blob)
+            - name: PAFA_BlobStorage__Provider
+              value: "MinIO"
+            - name: PAFA_BlobStorage__Endpoint
+              value: "minio.pafa.svc.cluster.local:9000"
+            - name: PAFA_BlobStorage__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: minio-access-key
+            - name: PAFA_BlobStorage__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: minio-secret-key
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pafa-reports-pvc
+  namespace: pafa
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: managed-premium

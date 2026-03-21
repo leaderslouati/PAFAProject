@@ -14,6 +14,21 @@ namespace PAFA.Infrastructure.Migrations
         protected override void Up(MigrationBuilder migrationBuilder)
         {
             migrationBuilder.CreateTable(
+                name: "dim_calendar",
+                columns: table => new
+                {
+                    report_month = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
+                    year = table.Column<int>(type: "integer", nullable: false),
+                    month_num = table.Column<int>(type: "integer", nullable: false),
+                    month_label = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
+                    quarter = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_dim_calendar", x => x.report_month);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "ingestion_jobs",
                 columns: table => new
                 {
@@ -32,12 +47,12 @@ namespace PAFA.Infrastructure.Migrations
                     StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CompletedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     ParentJobId = table.Column<Guid>(type: "uuid", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -61,12 +76,12 @@ namespace PAFA.Infrastructure.Migrations
                     AQThresholdHigh = table.Column<decimal>(type: "numeric(12,4)", nullable: true),
                     MinReadPercentage = table.Column<decimal>(type: "numeric(6,3)", nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: false, defaultValueSql: "decode('', 'hex')")
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -84,12 +99,12 @@ namespace PAFA.Infrastructure.Migrations
                     Audience = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
                     ReportCount = table.Column<int>(type: "integer", nullable: false),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: false, defaultValueSql: "decode('', 'hex')")
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -100,21 +115,21 @@ namespace PAFA.Infrastructure.Migrations
                 name: "shippers",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    Name = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
-                    ShortCode = table.Column<string>(type: "character(3)", fixedLength: true, maxLength: 3, nullable: false),
-                    LegalEntity = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
-                    Email = table.Column<string>(type: "character varying(255)", maxLength: 255, nullable: true),
-                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    name = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: false),
+                    short_code = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    legal_entity = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    Email = table.Column<string>(type: "text", nullable: true),
+                    is_active = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
                     MarketEntryDate = table.Column<DateOnly>(type: "date", nullable: true),
                     MarketExitDate = table.Column<DateOnly>(type: "date", nullable: true),
                     PortfolioSize = table.Column<int>(type: "integer", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
-                    CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -141,12 +156,12 @@ namespace PAFA.Infrastructure.Migrations
                     ErrorCount = table.Column<int>(type: "integer", nullable: false),
                     DownloadedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     ProcessedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true, defaultValueSql: "decode('', 'hex')")
                 },
                 constraints: table =>
                 {
@@ -178,12 +193,12 @@ namespace PAFA.Infrastructure.Migrations
                     CommentaryText = table.Column<string>(type: "character varying(5000)", maxLength: 5000, nullable: true),
                     CommentaryBy = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
                     IsBaseline = table.Column<bool>(type: "boolean", nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -205,12 +220,12 @@ namespace PAFA.Infrastructure.Migrations
                     ReportingPeriod = table.Column<DateOnly>(type: "date", nullable: false),
                     SupplyPointCount = table.Column<int>(type: "integer", nullable: true),
                     TotalAQ_MWH = table.Column<decimal>(type: "numeric(14,4)", nullable: true),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true, defaultValueSql: "decode('', 'hex')")
                 },
                 constraints: table =>
                 {
@@ -234,18 +249,20 @@ namespace PAFA.Infrastructure.Migrations
                 columns: table => new
                 {
                     Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
-                    IngestionFileId = table.Column<Guid>(type: "uuid", nullable: false),
+                    ReportingPeriod = table.Column<DateOnly>(type: "date", nullable: false),
                     ShipperShortCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
                     MetricKey = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
                     Value = table.Column<decimal>(type: "numeric(12,4)", nullable: false),
-                    ReportingPeriod = table.Column<DateOnly>(type: "date", nullable: false),
-                    CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    TextValue = table.Column<string>(type: "text", nullable: true),
+                    product_class_code = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    IngestionFileId = table.Column<Guid>(type: "uuid", nullable: false),
                     ShipperId = table.Column<Guid>(type: "uuid", nullable: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "text", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -275,12 +292,12 @@ namespace PAFA.Infrastructure.Migrations
                     ErrorMessage = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: false),
                     OriginalValue = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: true),
                     Severity = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false, defaultValueSql: "NOW() AT TIME ZONE 'UTC'"),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: false)
+                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true)
                 },
                 constraints: table =>
                 {
@@ -294,14 +311,45 @@ namespace PAFA.Infrastructure.Migrations
                 });
 
             migrationBuilder.InsertData(
+                table: "dim_calendar",
+                columns: new[] { "report_month", "month_label", "month_num", "quarter", "year" },
+                values: new object[,]
+                {
+                    { "2024-01", "January 2024", 1, "Q1", 2024 },
+                    { "2024-02", "February 2024", 2, "Q1", 2024 },
+                    { "2024-03", "March 2024", 3, "Q1", 2024 },
+                    { "2024-04", "April 2024", 4, "Q2", 2024 },
+                    { "2024-05", "May 2024", 5, "Q2", 2024 },
+                    { "2024-06", "June 2024", 6, "Q2", 2024 },
+                    { "2024-07", "July 2024", 7, "Q3", 2024 },
+                    { "2024-08", "August 2024", 8, "Q3", 2024 },
+                    { "2024-09", "September 2024", 9, "Q3", 2024 },
+                    { "2024-10", "October 2024", 10, "Q4", 2024 },
+                    { "2024-11", "November 2024", 11, "Q4", 2024 },
+                    { "2024-12", "December 2024", 12, "Q4", 2024 },
+                    { "2025-01", "January 2025", 1, "Q1", 2025 },
+                    { "2025-02", "February 2025", 2, "Q1", 2025 },
+                    { "2025-03", "March 2025", 3, "Q1", 2025 },
+                    { "2025-04", "April 2025", 4, "Q2", 2025 },
+                    { "2025-05", "May 2025", 5, "Q2", 2025 },
+                    { "2025-06", "June 2025", 6, "Q2", 2025 },
+                    { "2025-07", "July 2025", 7, "Q3", 2025 },
+                    { "2025-08", "August 2025", 8, "Q3", 2025 },
+                    { "2025-09", "September 2025", 9, "Q3", 2025 },
+                    { "2025-10", "October 2025", 10, "Q4", 2025 },
+                    { "2025-11", "November 2025", 11, "Q4", 2025 },
+                    { "2025-12", "December 2025", 12, "Q4", 2025 }
+                });
+
+            migrationBuilder.InsertData(
                 table: "product_classes",
                 columns: new[] { "Id", "AQThresholdHigh", "AQThresholdLow", "Code", "CreatedAt", "CreatedBy", "Description", "IsActive", "IsDeleted", "MinReadPercentage", "RowVersion", "UpdatedAt", "UpdatedBy" },
                 values: new object[,]
                 {
-                    { 1, null, 732m, "PC1", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "Large sites — AQ ≥ 732 MWH", true, false, 97.5m, new byte[0], null, null },
-                    { 2, null, null, "PC2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "Medium NDM", true, false, null, new byte[0], null, null },
-                    { 3, null, null, "PC3", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "Small NDM WAR", true, false, null, new byte[0], null, null },
-                    { 4, null, null, "PC4", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "IGT Small", true, false, null, new byte[0], null, null }
+                    { 1, null, 732m, "PC1", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "Large sites — AQ ≥ 732 MWH", true, false, 97.5m, null, null, null },
+                    { 2, null, null, "PC2", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "Medium NDM", true, false, null, null, null, null },
+                    { 3, null, null, "PC3", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "Small NDM WAR", true, false, null, null, null, null },
+                    { 4, null, null, "PC4", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", "IGT Small", true, false, null, null, null, null }
                 });
 
             migrationBuilder.InsertData(
@@ -309,8 +357,23 @@ namespace PAFA.Infrastructure.Migrations
                 columns: new[] { "Id", "Audience", "Code", "CreatedAt", "CreatedBy", "IsActive", "IsDeleted", "Label", "ReportCount", "RowVersion", "ScheduleRef", "UpdatedAt", "UpdatedBy" },
                 values: new object[,]
                 {
-                    { 1, "Industry", "SCH2A", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", true, false, "Industry Peer Comparison (Anonymised)", 19, new byte[0], "Schedule 2A", null, null },
-                    { 2, "PAC", "SCH2B", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", true, false, "Performance Assurance Committee (Non-Anonymised)", 22, new byte[0], "Schedule 2B", null, null }
+                    { 1, "Industry", "SCH2A", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", true, false, "Industry Peer Comparison (Anonymised)", 19, null, "Schedule 2A", null, null },
+                    { 2, "PAC", "SCH2B", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", true, false, "Performance Assurance Committee (Non-Anonymised)", 22, null, "Schedule 2B", null, null }
+                });
+
+            migrationBuilder.InsertData(
+                table: "shippers",
+                columns: new[] { "Id", "CreatedAt", "CreatedBy", "Email", "is_active", "IsDeleted", "legal_entity", "MarketEntryDate", "MarketExitDate", "name", "PortfolioSize", "RowVersion", "short_code", "UpdatedAt", "UpdatedBy" },
+                values: new object[,]
+                {
+                    { new Guid("a0000001-0000-0000-0000-000000000001"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Alpha Gas Limited", null, null, "Alpha Gas Ltd", null, null, "SHIP_A", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000002"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Beta Energy PLC", null, null, "Beta Energy plc", null, null, "SHIP_B", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000003"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Gamma Supply Limited", null, null, "Gamma Supply Ltd", null, null, "SHIP_C", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000004"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Delta Gas Company", null, null, "Delta Gas Co", null, null, "SHIP_D", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000005"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Epsilon Energy Ltd", null, null, "Epsilon Energy", null, null, "SHIP_E", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000006"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Zeta Gas Limited", null, null, "Zeta Gas Ltd", null, null, "SHIP_F", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000007"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Eta Supply PLC", null, null, "Eta Supply plc", null, null, "SHIP_G", null, null },
+                    { new Guid("a0000001-0000-0000-0000-000000000008"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Theta Gas Corporation", null, null, "Theta Gas Corp", null, null, "SHIP_H", null, null }
                 });
 
             migrationBuilder.CreateIndex(
@@ -359,6 +422,11 @@ namespace PAFA.Infrastructure.Migrations
                 columns: new[] { "ReportingPeriod", "MetricKey" });
 
             migrationBuilder.CreateIndex(
+                name: "ix_mv_product_class",
+                table: "metric_values",
+                column: "product_class_code");
+
+            migrationBuilder.CreateIndex(
                 name: "ix_mv_ssc",
                 table: "metric_values",
                 column: "ShipperShortCode");
@@ -398,20 +466,59 @@ namespace PAFA.Infrastructure.Migrations
                 column: "ProductClassId");
 
             migrationBuilder.CreateIndex(
-                name: "ix_shipper_ssc",
+                name: "ix_shipper_short_code",
                 table: "shippers",
-                column: "ShortCode",
+                column: "short_code",
                 unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "ix_valerr_file",
                 table: "validation_errors",
                 column: "IngestionFileId");
+           
+            // Dans le fichier migration généré — ajouter dans Up()
+            migrationBuilder.Sql(@"
+                CREATE VIEW fact_read_performance AS
+                SELECT
+                    TO_CHAR(mv.reporting_period, 'YYYY-MM')   AS report_month,
+                    mv.shipper_short_code                      AS shipper_code,
+                    mv.product_class_code                      AS product_class,
+                    MAX(CASE WHEN mv.metric_key = 'read_performance_pct'
+                             THEN mv.value END)                AS read_perf_pct,
+                    MAX(CASE WHEN mv.metric_key = 'estimated_read_pct'
+                             THEN mv.value END)                AS estimated_pct,
+                    MAX(CASE WHEN mv.metric_key = 'check_read_count'
+                             THEN mv.value END)                AS check_read_count,
+                    MAX(CASE WHEN mv.metric_key = 'total_site_count'
+                             THEN mv.value END)                AS total_sites,
+                    CASE
+                        WHEN mv.product_class_code = 'PC1'
+                             AND MAX(CASE WHEN mv.metric_key = 'read_performance_pct'
+                                          THEN mv.value END) >= 97.5
+                        THEN TRUE
+                        WHEN mv.product_class_code = 'PC2'
+                             AND MAX(CASE WHEN mv.metric_key = 'read_performance_pct'
+                                          THEN mv.value END) >= 80.0
+                        THEN TRUE
+                        ELSE FALSE
+                    END                                        AS is_compliant
+                FROM metric_values mv
+                WHERE mv.product_class_code IS NOT NULL
+                GROUP BY
+                    mv.reporting_period,
+                    mv.shipper_short_code,
+                    mv.product_class_code;
+            ");
+
+           
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
+            migrationBuilder.DropTable(
+                name: "dim_calendar");
+
             migrationBuilder.DropTable(
                 name: "metric_values");
 
@@ -438,6 +545,9 @@ namespace PAFA.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ingestion_jobs");
+
+            // Et dans Down() pour rollback propre
+            migrationBuilder.Sql("DROP VIEW IF EXISTS fact_read_performance;");
         }
     }
 }

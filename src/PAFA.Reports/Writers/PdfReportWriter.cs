@@ -36,17 +36,17 @@ public  class PdfReportWriter : IReportWriter
                         foreach (var _ in props) c.RelativeColumn();
                     });
 
-                    // En-têtes
+                    // ✓ FIX: Call table.Header() ONCE and define all header cells inside
                     table.Header(header =>
                     {
                         foreach (var p in props)
-                            header.Cell().Background(Colors.Grey.Lighten2).Text(p.Name).Bold().FontSize(9);
+                            header.Cell().Background(Colors.Grey.Lighten2).Padding(5).Text(p.Name).Bold().FontSize(9);
                     });
 
                     // Données
                     foreach (var row in rows)
                         foreach (var p in props)
-                            table.Cell().Text((p.GetValue(row) ?? "").ToString()!).FontSize(8);
+                            table.Cell().Padding(3).Text((p.GetValue(row) ?? "").ToString()!).FontSize(8);
                 });
 
                 page.Footer().AlignCenter().Text(x =>

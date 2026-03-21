@@ -13,9 +13,33 @@ namespace PAFA.Api.Controllers;
 public class ReportController(
     IMediator mediator, 
     IEnumerable<IReportWriter> writers, 
-    IReportRepository reportRepo,
     IMetricValueRepository metricRepo) : ControllerBase
 {
+    /// <summary>
+    /// GET /api/powerbi/export?year=2025&amp;month=2
+    /// Génère un CSV pour Power BI avec toutes les métriques de la période.
+    /// </summary>
+    [HttpGet("powerbi")]
+    [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
+    public async Task<IActionResult> ExportPowerBiCsv(
+        [FromQuery] int? year, 
+        [FromQuery] int? month, 
+        CancellationToken ct = default)
+    {
+        var query = new ExportPowerBiCsvQuery
+        {
+            PeriodYear = year,
+            PeriodMonth = month
+        };
+
+        var stream = await mediator.Send(query, ct);
+        var fileName = year.HasValue && month.HasValue
+            ? $"PAFA_PowerBI_{year}_{month:D2}.csv"
+            : $"PAFA_PowerBI_All.csv";
+
+        return File(stream, "text/csv", fileName);
+    }
+
     [HttpGet("export/pdf")]
     [ProducesResponseType(typeof(FileStreamResult), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status501NotImplemented)]

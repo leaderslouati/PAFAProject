@@ -1,62 +1,89 @@
 name: pafa-project
 
-# On inclut la base de données
+# Base de données PostgreSQL
 include:
   - docker-compose.psql.dev.yml
 
 services:
-  # 1. Le Message Broker (RabbitMQ)
-  rabbitmq:
-    image: rabbitmq:3-management-alpine
-    container_name: pafa_rabbitmq
-    ports:
-      - "5672:5672"   # Port AMQP pour .NET
-      - "15672:15672" # Interface Web de management
-    environment:
-      - RABBITMQ_DEFAULT_USER=guest
-      - RABBITMQ_DEFAULT_PASS=guest
-    healthcheck:
-      test: [ "CMD", "rabbitmq-diagnostics", "-q", "check_running" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
-  # 2. Service SFTP pour les rapports
+  # ═══════════════════════════════════════════════════════════════
+  #  1. SFTP SERVER — simule Xoserve
+  # ═══════════════════════════════════════════════════════════════
   pafa-sftp:
     image: atmoz/sftp
     container_name: pafa_sftp
     ports:
       - "2222:22"
     volumes:
-      - ./sftp-data/upload:/home/xoserve/upload
-      - ./sftp-data/processed:/home/xoserve/processed
+      - ./xoserve/upload:/home/xoserve/upload
+      - ./xoserve/processed:/home/xoserve/processed
+      - ./xoserve/failed:/home/xoserve/failed
     command: xoserve:xoserve_pass:1001
     networks:
       default:
         aliases:
           - pafa_sftp
 
-  # 3. Service pour les rapports par lots
-  pafa-batch-reports:
+  # ═══════════════════════════════════════════════════════════════
+  #  2. MINIO — simule Azure Blob Storage
+  # ═══════════════════════════════════════════════════════════════
+  minio:
+    image: minio/minio:latest
+    container_name: pafa_minio
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    volumes:
+      - pafa_minio_data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ═══════════════════════════════════════════════════════════════
+  #  3. BATCH — profil "batch" (ne démarre pas avec 'docker compose up')
+  #
+  #  Lancement :
+  #    docker compose run --rm pafa-batch --once
+  #    docker compose run --rm pafa-batch --ingest
+  #    docker compose run --rm pafa-batch --reports
+  #    docker compose run --rm pafa-batch --year 2025 --month 2 --once
+  # ═══════════════════════════════════════════════════════════════
+  pafa-batch:
     build:
       context: .
       dockerfile: src/PAFA.BatchReports/Dockerfile
-    image: pafa-batch-reports:latest
-    container_name: pafa_batch_reports
+    image: pafa-batch:latest
+    profiles: ["batch"]
     environment:
       - DOTNET_ENVIRONMENT=Production
       - PAFA_ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=pafadb;Username=postgres;Password=postgres
+      - PAFA_Sftp__Host=pafa_sftp
+      - PAFA_Sftp__Port=22
+      - PAFA_Sftp__Username=xoserve
+      - PAFA_Sftp__Password=xoserve_pass
+      - PAFA_BlobStorage__Provider=MinIO
+      - PAFA_BlobStorage__Endpoint=pafa_minio:9000
+      - PAFA_BlobStorage__AccessKey=minioadmin
+      - PAFA_BlobStorage__SecretKey=minioadmin
       - PAFA_BatchReports__OutputDirectory=/app/output/reports
-      - PAFA_BatchReports__TempDirectory=/app/output/reports/temp
     volumes:
       - pafa_reports_data:/app/output/reports
     depends_on:
       db:
         condition: service_healthy
+      minio:
+        condition: service_healthy
 
 volumes:
+  pafa_minio_data:
   pafa_reports_data:
 
 networks:
   default:
     name: pafa_network
+    external: true

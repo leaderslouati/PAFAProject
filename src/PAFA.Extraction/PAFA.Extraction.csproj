@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
 		<TargetFramework>net9.0</TargetFramework>
@@ -10,13 +10,11 @@
 	<ItemGroup>
 		<ProjectReference Include="..\PAFA.Domain\PAFA.Domain.csproj" />
 		<ProjectReference Include="..\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
-		<ProjectReference Include="..\PAFA.Messaging\PAFA.Messaging.csproj" />
 	</ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="MediatR" Version="12.*" />
 		<PackageReference Include="Microsoft.AspNetCore.Http" Version="2.3.9" />
-		<PackageReference Include="RabbitMQ.Client" Version="7.2.1" />
 	</ItemGroup>
 
 </Project>

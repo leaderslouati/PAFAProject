@@ -3,6 +3,8 @@
 // ════════════════════════════════════════════════════════════
 using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
+using PAFA.Infrastructure.EntityConfigurations;
+using PAFA.Infrastructure.Persistence.Configurations;
 
 namespace PAFA.Infrastructure.Persistence;
 
@@ -18,18 +20,22 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     public DbSet<ReportType> ReportTypes => Set<ReportType>();
     public DbSet<Report> Reports => Set<Report>();
 
-    protected override void OnModelCreating(ModelBuilder mb)
+    public DbSet<DimCalendar> DimCalendars { get; set; }
+    public DbSet<FactReadPerformance> FactReadPerformances { get; set; }
+    protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        mb.ApplyConfigurationsFromAssembly(typeof(PafaDbContext).Assembly);
+        modelBuilder.ApplyConfiguration(new IngestionJobConfiguration());
+        modelBuilder.ApplyConfiguration(new IngestionFileConfiguration());
+        modelBuilder.ApplyConfiguration(new MetricValueConfiguration());
+        modelBuilder.ApplyConfiguration(new ShipperConfiguration());
+        modelBuilder.ApplyConfiguration(new ProductClassConfiguration());
+        modelBuilder.ApplyConfiguration(new ShipperProductClassConfiguration());
+        modelBuilder.ApplyConfiguration(new ValidationErrorConfiguration());
+        modelBuilder.ApplyConfiguration(new ReportConfiguration());
+        modelBuilder.ApplyConfiguration(new ReportTypeConfiguration());
 
-        // Convention globale : CreatedAt → valeur SQL par défaut (stable, non-dynamique)
-        foreach (var entity in mb.Model.GetEntityTypes())
-        {
-            var prop = entity.FindProperty("CreatedAt");
-            if (prop != null && prop.ClrType == typeof(DateTime))
-                prop.SetDefaultValueSql("NOW() AT TIME ZONE 'UTC'");
-        }
-
-        base.OnModelCreating(mb);
+        // Power BI configurations
+        modelBuilder.ApplyConfiguration(new DimCalendarConfiguration());
+        modelBuilder.ApplyConfiguration(new FactReadPerformanceConfiguration());
     }
 }

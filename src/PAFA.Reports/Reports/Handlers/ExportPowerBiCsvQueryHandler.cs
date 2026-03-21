@@ -21,12 +21,23 @@ public  class ExportPowerBiCsvQueryHandler
     {
         var metrics = await _repo.GetFilteredAsync(q.PeriodYear, q.PeriodMonth, null, null, ct);
 
-        var rows = metrics.Select(m => new PowerBiCsvRowDto
-        {
-            PeriodeDate = m.ReportingPeriod, 
-            ShipperCode = m.ShipperShortCode            
-        }).ToList();
+        var rows = metrics
+          .GroupBy(m => new { m.ShipperShortCode, m.ReportingPeriod })
+          .Select(g => new PowerBiCsvRowDto
+          {
+              PeriodeDate = g.Key.ReportingPeriod,
+              ShipperCode = g.Key.ShipperShortCode,
+              ReadPerformancePct = Val(g, "readperformancepct"),
+              EstimatedReadPct = Val(g, "estimatedreadpct"),
+              AqOverdueCount = (int?)Val(g, "aqoverduecount"),
+              TotalSiteCount = (int?)Val(g, "totalsitecount"),
+              ProductClass = (int?)Val(g, "productclass"),
+              IsIndustryAverage = false
+          }).ToList();
 
+        static decimal? Val(IGrouping<dynamic, MetricValue> g, string key)
+            => g.FirstOrDefault(m =>
+                m.MetricKey.Equals(key, StringComparison.OrdinalIgnoreCase))?.Value;
         var writer = _writers.SingleOrDefault(w => w.Format == ExportFormat.Csv)
             ?? throw new InvalidOperationException("Aucun CsvReportWriter enregistré en DI.");
 
