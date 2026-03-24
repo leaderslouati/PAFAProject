@@ -1,11 +1,11 @@
 ﻿# =============================================================================
-# PAFA Batch — Data Ingestion Service
-# Linear pipeline: SFTP → MinIO → Parse → Validate → Insert DB
+# PAFA Batch — Data Ingestion & Report Generation Service
+# Pipeline: SharePoint → Azure Blob Storage → Parse → Validate → Insert DB → Reports
 #
 # Usage:
 #   docker build -t pafa-batch:local -f src/PAFA.BatchReports/Dockerfile .
 #   docker run --rm pafa-batch:local --ingest
-#   docker run --rm pafa-batch:local --ingest --year 2025 --month 2
+#   docker run --rm pafa-batch:local --ingest --year 2025 --month 7
 #   docker run --rm pafa-batch:local --reports
 #   docker run --rm pafa-batch:local --once
 # =============================================================================

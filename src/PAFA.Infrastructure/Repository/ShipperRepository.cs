@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using PAFA.Domain.Entities.Referential;
 using PAFA.Domain.IRepository;
 using PAFA.Infrastructure.Persistence;
 

@@ -1,4 +1,6 @@
-﻿namespace PAFA.Infrastructure.Parsing;
+﻿using PAFA.Domain.Interfaces;
+
+namespace PAFA.Infrastructure.Parsing;
 
 /// <summary>
 /// Resolves the correct IFileParser implementation for a given file extension.

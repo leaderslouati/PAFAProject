@@ -3,6 +3,9 @@
 // ════════════════════════════════════════════════════════════
 using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
+
+using PAFA.Domain.Entities.Authentication;
+using PAFA.Domain.Entities.Referential;
 using PAFA.Infrastructure.EntityConfigurations;
 using PAFA.Infrastructure.Persistence.Configurations;
 
@@ -10,18 +13,30 @@ namespace PAFA.Infrastructure.Persistence;
 
 public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(options)
 {
+    // ── Auth ────────────────────────────────────────────────
+    public DbSet<PafaUser> PafaUsers => Set<PafaUser>();
+    public DbSet<PafaRole> PafaRoles => Set<PafaRole>();
+    public DbSet<PafaUserRole> PafaUserRoles => Set<PafaUserRole>();
+
+    // ── Referential ─────────────────────────────────────────
+    public DbSet<Shipper> Shippers => Set<Shipper>();
+    public DbSet<ProductClass> ProductClasses => Set<ProductClass>();
+    public DbSet<ShipperProductClass> ShipperProductClasses => Set<ShipperProductClass>();
+    public DbSet<ShipperAlias> ShipperAliases => Set<ShipperAlias>();
+
+    // ── Ingestion ───────────────────────────────────────────
     public DbSet<IngestionJob> IngestionJobs => Set<IngestionJob>();
     public DbSet<IngestionFile> IngestionFiles => Set<IngestionFile>();
     public DbSet<ValidationError> ValidationErrors => Set<ValidationError>();
     public DbSet<MetricValue> MetricValues => Set<MetricValue>();
-    public DbSet<Shipper> Shippers => Set<Shipper>();
-    public DbSet<ProductClass> ProductClasses => Set<ProductClass>();
-    public DbSet<ShipperProductClass> ShipperProductClasses => Set<ShipperProductClass>();
+
+    // ── Reporting ────────────────────────────────────────────
     public DbSet<ReportType> ReportTypes => Set<ReportType>();
     public DbSet<Report> Reports => Set<Report>();
+    public DbSet<FactReadPerformance> FactReadPerformances => Set<FactReadPerformance>();       
 
-    public DbSet<DimCalendar> DimCalendars { get; set; }
-    public DbSet<FactReadPerformance> FactReadPerformances { get; set; }
+
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.ApplyConfiguration(new IngestionJobConfiguration());
@@ -33,9 +48,12 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
         modelBuilder.ApplyConfiguration(new ValidationErrorConfiguration());
         modelBuilder.ApplyConfiguration(new ReportConfiguration());
         modelBuilder.ApplyConfiguration(new ReportTypeConfiguration());
+        modelBuilder.ApplyConfiguration(new PafaRoleConfiguration());
+        modelBuilder.ApplyConfiguration(new PafaUserConfiguration());
+        modelBuilder.ApplyConfiguration(new PafaUserRoleConfiguration());
+        modelBuilder.ApplyConfiguration(new ShipperAliasConfiguration());
 
         // Power BI configurations
-        modelBuilder.ApplyConfiguration(new DimCalendarConfiguration());
         modelBuilder.ApplyConfiguration(new FactReadPerformanceConfiguration());
     }
 }

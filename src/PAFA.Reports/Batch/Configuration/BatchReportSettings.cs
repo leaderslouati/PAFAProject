@@ -8,11 +8,11 @@ public class BatchReportSettings
 {
     public const string SectionName = "BatchReports";
 
-    /// <summary>Target year for report generation (e.g., 2025).</summary>
-    public int TargetYear { get; set; }
+    /// <summary>Target year for report generation. Defaults to current UTC year if not set.</summary>
+    public int TargetYear { get; set; } = DateTime.UtcNow.Year;
 
-    /// <summary>Target month for report generation (1-12).</summary>
-    public int TargetMonth { get; set; }
+    /// <summary>Target month for report generation (1-12). Defaults to current UTC month if not set.</summary>
+    public int TargetMonth { get; set; } = DateTime.UtcNow.Month;
 
     /// <summary>Output directory for generated reports (e.g., /var/reports).</summary>
     public string OutputDirectory { get; set; } = "./reports";

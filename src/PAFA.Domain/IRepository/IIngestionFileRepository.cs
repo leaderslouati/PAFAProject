@@ -27,4 +27,11 @@ public interface IIngestionFileRepository : IBaseRepository<IngestionFile>
     /// Get all validation errors for a specific file.
     /// </summary>
     Task<IReadOnlyList<ValidationError>> GetValidationErrorsAsync(Guid fileId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the set of file names already successfully loaded (Status=Loaded)
+    /// for a given reporting period. Used by the cron to skip already-processed files
+    /// on resume/retry.
+    /// </summary>
+    Task<HashSet<string>> GetAlreadyLoadedFileNamesAsync(int year, int month, CancellationToken ct = default);
 }

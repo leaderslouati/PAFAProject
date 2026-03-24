@@ -1,6 +1,5 @@
 ﻿using MediatR;
-using PAFA.Domain.IRepository;
-using PAFA.Extraction.Commands.Export;
+using PAFA.Domain.Contracts;
 
 namespace PAFA.Reports.Dashboard.Queries;
 

@@ -1,5 +1,4 @@
-﻿using MediatR;
-using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Mvc;
 
 namespace PAFA.Api.Controllers;
 
@@ -14,7 +13,7 @@ public class BatchReportController : ControllerBase
         _log = log;
     }
     [HttpPost("trigger")]
-    public async Task<IActionResult> TriggerBatchReports([FromQuery] int year = 2025, [FromQuery] int month = 2,
+    public async Task<IActionResult> TriggerBatchReports([FromQuery] int year , [FromQuery] int month,
         CancellationToken ct = default)
     {
         _log.LogInformation("Déclenchement batch — {Year}-{Month:D2}", year, month);

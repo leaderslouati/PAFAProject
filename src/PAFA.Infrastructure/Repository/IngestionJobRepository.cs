@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
+using PAFA.Domain.Enums;
 using PAFA.Domain.IRepository;
 using PAFA.Infrastructure.Persistence;
 
@@ -22,5 +23,18 @@ namespace PAFA.Infrastructure.Repositories;
 
         public Task<IReadOnlyList<MetricDefinition>> GetMetricDefinitionsAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<MetricDefinition>>(new List<MetricDefinition>());
+
+        /// <inheritdoc />
+        public async Task<IngestionJob?> GetLatestByPeriodAsync(int year, int month, CancellationToken ct = default)
+            => await _ctx.IngestionJobs
+                .Where(j => j.ReportingPeriod == new DateOnly(year, month, 1))
+                .OrderByDescending(j => j.StartedAt)
+                .FirstOrDefaultAsync(ct);
+
+        /// <inheritdoc />
+        public Task<bool> IsAlreadyCompletedAsync(int year, int month, CancellationToken ct = default)
+            => _ctx.IngestionJobs
+                .AnyAsync(j => j.ReportingPeriod == new DateOnly(year, month, 1)
+                            && j.Status == IngestionJobStatus.Completed, ct);
     }
 

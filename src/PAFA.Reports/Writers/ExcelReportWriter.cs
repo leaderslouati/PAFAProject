@@ -1,6 +1,6 @@
 ﻿using ClosedXML.Excel;
 using PAFA.Domain.Enums;
-using PAFA.Extraction.Reports.Interfaces;
+using PAFA.Domain.Interfaces;
 
 namespace PAFA.Reports.Writers;
 

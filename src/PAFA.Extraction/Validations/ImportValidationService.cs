@@ -1,4 +1,4 @@
-﻿using PAFA.Infrastructure.Parsing;
+﻿using PAFA.Domain.Interfaces;
 
 namespace PAFA.Extraction.Validation;
 

@@ -25,6 +25,18 @@ public enum JobTrigger
     Scheduler, Manual, Api, Retry
 }
 
+/// <summary>
+/// Indicates whether a pipeline run was started by the automatic cron
+/// (day 18–21 of the month) or by a manual user action outside that window.
+/// </summary>
+public enum TriggerMode
+{
+    /// <summary>Cron window is active — run was started automatically.</summary>
+    Automatic,
+    /// <summary>Outside the cron window — run was started by a user.</summary>
+    Manual
+}
+
 public enum ReportStatus
 {
     Pending, Generating, Generated, Published, Archived, Failed

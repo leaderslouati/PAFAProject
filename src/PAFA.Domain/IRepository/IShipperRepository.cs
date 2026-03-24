@@ -1,4 +1,5 @@
 using PAFA.Domain.Entities;
+using PAFA.Domain.Entities.Referential;
 using PAFA.Domain.Repositories;
 
 namespace PAFA.Domain.IRepository;

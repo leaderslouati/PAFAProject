@@ -22,6 +22,18 @@ public interface IIngestionJobRepository : IBaseRepository<IngestionJob>
     /// Get all active metric definitions for calculations.
     /// </summary>
     Task<IReadOnlyList<MetricDefinition>> GetMetricDefinitionsAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns the most recent IngestionJob for the given period regardless of status.
+    /// Used during manual reprocess to locate the parent job and compute RetryCount.
+    /// </summary>
+    Task<IngestionJob?> GetLatestByPeriodAsync(int year, int month, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns true if a Completed job already exists for the period.
+    /// Used by the cron to detect a fully finished run and avoid duplicate processing.
+    /// </summary>
+    Task<bool> IsAlreadyCompletedAsync(int year, int month, CancellationToken ct = default);
 }
 
 /// <summary>
