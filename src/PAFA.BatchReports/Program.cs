@@ -21,30 +21,33 @@ using PAFA.Reports.Batch.Core;
 namespace PAFA.BatchReports;
 
 /// <summary>
-/// Single entry point for the entire PAFA data pipeline.
-/// Runs as a one-shot process triggered by Kubernetes CronJob (prod)
-/// or 'docker compose run' / 'dotnet run' (local dev).
-///
-/// Modes:
-///   --once    (default) : Full pipeline — SFTP → MinIO → Parse → Validate → Insert → Reports
-///   --ingest            : SFTP → MinIO → Parse → Validate → Insert DB only
-///   --reports           : Generate PDF/Excel from existing DB data only
-///   --year N --month N  : Override the target period (default: previous month)
-/// </summary>
+/// Single entry point for the PAFA data pipeline.
+//
+// Modes:
+//   --ingest                     : Process ALL files in SFTP /upload (period auto-detected from filename)
+//   --ingest --year N --month N  : Force period for all files
+//   --reports                    : Generate PDF/Excel from existing DB data
+//   --once                       : Full pipeline (ingest + reports)
+// </summary>
 class Program
 {
     static async Task<int> Main(string[] args)
     {
         try
         {
+            // Period is now OPTIONAL — null means "detect from filenames"
             var (year, month) = ResolvePeriod(args);
-            Console.WriteLine($"[PAFA Batch] Target period: {year}-{month:D2}");
+
+            if (year.HasValue && month.HasValue)
+                Console.WriteLine($"[PAFA Batch] Forced period: {year}-{month:D2}");
+            else
+                Console.WriteLine("[PAFA Batch] Period: auto-detect from filenames");
 
             var host = CreateHostBuilder(args, year, month).Build();
 
             using var scope = host.Services.CreateScope();
             var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
-            logger.LogInformation("PAFA Batch Starting — {Year}-{Month:D2}", year, month);
+            logger.LogInformation("PAFA Batch Starting");
 
             var db = scope.ServiceProvider.GetRequiredService<PafaDbContext>();
             if (!await db.Database.CanConnectAsync())
@@ -75,7 +78,7 @@ class Program
     // ════════════════════════════════════════════════════════════════
 
     static async Task<int> RunFullPipelineAsync(
-        IServiceScope scope, ILogger logger, int year, int month)
+        IServiceScope scope, ILogger logger, int? year, int? month)
     {
         var ingestCode = await RunIngestionAsync(scope, logger, year, month);
         if (ingestCode != 0)
@@ -85,9 +88,9 @@ class Program
     }
 
     static async Task<int> RunIngestionAsync(
-        IServiceScope scope, ILogger logger, int year, int month)
+        IServiceScope scope, ILogger logger, int? year, int? month)
     {
-        logger.LogInformation("═══ Phase 1: SFTP → MinIO → Parse → Validate → Insert DB ═══");
+        logger.LogInformation("═══ SFTP Ingestion: process all files in /upload ═══");
         try
         {
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
@@ -108,7 +111,7 @@ class Program
 
     static async Task<int> RunReportsAsync(IServiceScope scope, ILogger logger)
     {
-        logger.LogInformation("═══ Phase 2: Report Generation (PDF/Excel) ═══");
+        logger.LogInformation("═══ Report Generation (PDF/Excel) ═══");
         try
         {
             var orchestrator = scope.ServiceProvider.GetRequiredService<BatchReportOrchestrator>();
@@ -126,11 +129,12 @@ class Program
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  PERIOD RESOLUTION
+    //  PERIOD RESOLUTION — now returns nullable
     // ════════════════════════════════════════════════════════════════
 
-    static (int year, int month) ResolvePeriod(string[] args)
+    static (int? year, int? month) ResolvePeriod(string[] args)
     {
+        // 1. CLI args: --year 2025 --month 2
         var yearArg  = GetArg(args, "--year");
         var monthArg = GetArg(args, "--month");
 
@@ -138,6 +142,7 @@ class Program
             int.TryParse(monthArg, out int m) && m is >= 1 and <= 12)
             return (y, m);
 
+        // 2. Env vars
         var envYear  = Environment.GetEnvironmentVariable("PAFA_TargetYear");
         var envMonth = Environment.GetEnvironmentVariable("PAFA_TargetMonth");
 
@@ -145,8 +150,8 @@ class Program
             int.TryParse(envMonth, out int em) && em is >= 1 and <= 12)
             return (ey, em);
 
-        var prev = DateOnly.FromDateTime(DateTime.UtcNow).AddMonths(-1);
-        return (prev.Year, prev.Month);
+        // 3. No period specified → auto-detect from filenames
+        return (null, null);
     }
 
     static BatchMode ResolveMode(string[] args)
@@ -163,10 +168,10 @@ class Program
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  HOST BUILDER — all services for the linear pipeline
+    //  HOST BUILDER
     // ════════════════════════════════════════════════════════════════
 
-    static IHostBuilder CreateHostBuilder(string[] args, int year, int month) =>
+    static IHostBuilder CreateHostBuilder(string[] args, int? year, int? month) =>
         Host.CreateDefaultBuilder(args)
             .ConfigureAppConfiguration((context, config) =>
             {
@@ -180,21 +185,18 @@ class Program
             })
             .ConfigureServices((context, services) =>
             {
-                // ── Batch settings ──────────────────────────────────
                 var batchSettings = context.Configuration
                     .GetSection(BatchReportSettings.SectionName)
                     .Get<BatchReportSettings>() ?? new BatchReportSettings();
-                batchSettings.TargetYear  = year;
-                batchSettings.TargetMonth = month;
+                if (year.HasValue) batchSettings.TargetYear = year.Value;
+                if (month.HasValue) batchSettings.TargetMonth = month.Value;
                 services.AddSingleton(batchSettings);
 
-                // ── Database ────────────────────────────────────────
                 services.AddDbContext<PafaDbContext>(options =>
                     options.UseNpgsql(
                         context.Configuration.GetConnectionString("DefaultConnection"),
                         npgsql => npgsql.EnableRetryOnFailure(batchSettings.MaxRetryAttempts)));
 
-                // ── Repositories ────────────────────────────────────
                 services.AddScoped<IUnitOfWork,              UnitOfWork>();
                 services.AddScoped<IIngestionJobRepository,  IngestionJobRepository>();
                 services.AddScoped<IIngestionFileRepository, IngestionFileRepository>();
@@ -202,12 +204,10 @@ class Program
                 services.AddScoped<IReportRepository,        ReportRepository>();
                 services.AddScoped<IMetricValueRepository,   MetricValueRepository>();
 
-                // ── SFTP ────────────────────────────────────────────
                 services.Configure<SftpSettings>(
                     context.Configuration.GetSection(SftpSettings.SectionName));
                 services.AddScoped<ISftpFileSource, SftpFileDownloader>();
 
-                // ── Blob Storage (MinIO / Local) ────────────────────
                 services.Configure<BlobStorageSettings>(
                     context.Configuration.GetSection(BlobStorageSettings.SectionName));
                 var blobProvider = context.Configuration["BlobStorage:Provider"] ?? "Local";
@@ -216,22 +216,20 @@ class Program
                 else
                     services.AddSingleton<IBlobStorageService, LocalBlobStorageService>();
 
-                // ── File Parsing ────────────────────────────────────
+                // ── File Parsing ────────────────────────────────────────
                 services.AddScoped<IFileParser, ExcelFileParser>();
                 services.AddScoped<IFileParser, CsvFileParser>();
+                services.AddScoped<IFileParser, XmlFileParser>();
                 services.AddScoped<FileParserFactory>();
 
-                // ── MediatR (CQRS handlers) ─────────────────────────
                 services.AddMediatR(cfg =>
                     cfg.RegisterServicesFromAssembly(
                         typeof(UploadParrFilesCommand).Assembly));
 
-                // ── Report Generators ───────────────────────────────
                 services.AddScoped<ReportGenerator, PdfReportGenerator>();
                 services.AddScoped<ReportGenerator, ExcelReportGenerator>();
                 services.AddScoped<BatchReportOrchestrator>();
 
-                // ── Logging ─────────────────────────────────────────
                 services.AddLogging(logging =>
                 {
                     logging.ClearProviders();

@@ -12,19 +12,21 @@ public class SftpController : ControllerBase
     public SftpController(IMediator mediator) => _mediator = mediator;
 
     /// <summary>
-    /// POST /api/sftp/ingest?year=2025&amp;month=2
+    /// POST /api/sftp/ingest
     /// Déclenche manuellement le téléchargement SFTP + import.
-    /// Pour le POC : appel depuis Swagger à chaque test.
-    /// En production : appelé par MonthlyIngestionService.
+    /// Si year/month ne sont pas fournis, la période est détectée
+    /// automatiquement depuis le nom de chaque fichier Xoserve.
     /// </summary>
     [HttpPost("ingest")]
     public async Task<IActionResult> Ingest(
-        [FromQuery] int year,
-        [FromQuery] int month,
+        [FromQuery] int? year = null,
+        [FromQuery] int? month = null,
         CancellationToken ct = default)
     {
-        if (year < 2020 || year > 2030) return BadRequest("Année invalide.");
-        if (month < 1 || month > 12) return BadRequest("Mois invalide.");
+        if (year.HasValue && (year < 2020 || year > 2040))
+            return BadRequest("Année invalide.");
+        if (month.HasValue && (month < 1 || month > 12))
+            return BadRequest("Mois invalide.");
 
         var result = await _mediator.Send(
             new DownloadParrFilesCommand(year, month), ct);
@@ -33,7 +35,7 @@ public class SftpController : ControllerBase
             return StatusCode(500, result);
 
         return result.FilesFailed > 0
-            ? StatusCode(207, result)  // 207 Multi-Status — partial success
+            ? StatusCode(207, result)
             : Ok(result);
     }
 }

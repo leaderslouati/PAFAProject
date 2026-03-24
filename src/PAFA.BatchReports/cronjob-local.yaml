@@ -14,15 +14,22 @@
 #   # 2. Déployer le CronJob
 #   kubectl apply -f src/PAFA.BatchReports/cronjob-local.yaml
 #
-#   # 3. Lancer manuellement (tester maintenant, sans attendre le cron)
-#   kubectl create job pafa-test-run-01 --from=cronjob/pafa-ingestion-cronjob
+#   # 3. Surveiller (le job se lance automatiquement au prochain créneau)
+#   kubectl get jobs -w
+#   kubectl logs -f -l app=pafa-batch
 #
-#   # 4. Voir les logs en direct
-#   kubectl logs -f job/pafa-test-run-01
-#
-#   # 5. Nettoyer après test
-#   kubectl delete job pafa-test-run-01
+#   # 4. Nettoyer après test
 #   kubectl delete -f src/PAFA.BatchReports/cronjob-local.yaml
+#
+# ??? ASTUCE : changer le schedule pour tester immédiatement ???????????????????
+#   Exemple : il est 15:35, vous voulez que ça se lance à 15:37
+#     schedule: "37 15 * * *"
+#
+#   Format cron : MINUTE HEURE JOUR_MOIS MOIS JOUR_SEMAINE
+#     "*/2 * * * *"    ? toutes les 2 minutes (stress test)
+#     "37 15 * * *"    ? tous les jours à 15:37
+#     "0 2 1 * *"      ? le 1er du mois à 02:00 (production)
+#     "37 15 21 3 *"   ? le 21 mars à 15:37 (date précise)
 # =============================================================================
 
 apiVersion: batch/v1
@@ -30,22 +37,35 @@ kind: CronJob
 metadata:
   name: pafa-ingestion-cronjob
 spec:
-  # Planning (ignoré lors du test manuel avec kubectl create job)
-  schedule: "0 2 1 * *"
+  # ??????????????????????????????????????????????????????????????????
+  #  SCHEDULE — Modifier ici pour tester sans attendre
+  #
+  #  Pour tester MAINTENANT : regardez votre horloge, ajoutez 2 min
+  #  Exemple : il est 15:35 ? mettez "37 15 * * *"
+  #
+  #  Production : "0 2 1 * *" (1er du mois à 02:00 UTC)
+  # ??????????????????????????????????????????????????????????????????
+  schedule: "*/2 * * * *"   # ? TOUTES LES 2 MIN (pour test local)
+  # schedule: "0 2 1 * *"   # ? PRODUCTION (1er du mois à 02:00 UTC)
+
   concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
 
   jobTemplate:
     spec:
       backoffLimit: 2
-      activeDeadlineSeconds: 600     # 10 min (suffisant en local)
+      activeDeadlineSeconds: 600
       template:
+        metadata:
+          labels:
+            app: pafa-batch
         spec:
           restartPolicy: Never
 
           containers:
           - name: pafa-batch
             image: pafa-batch:local
-            # CRUCIAL en local : ne pas chercher l'image sur internet
             imagePullPolicy: Never
 
             # Ingestion uniquement (SFTP ? MinIO ? Parse ? Validate ? Insert)

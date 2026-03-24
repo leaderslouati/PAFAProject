@@ -137,11 +137,24 @@ public sealed class SftpFileDownloader : ISftpFileSource
 
     private static bool MatchesPattern(string fileName, string pattern)
     {
+        // Toujours ignorer les fichiers cachés / système
+        if (fileName.StartsWith('.')) return false;
+
+        // "*" = tous les fichiers supportés (xlsx, xls, csv, xml)
+        if (pattern == "*")
+        {
+            var ext = Path.GetExtension(fileName).ToLowerInvariant();
+            return ext is ".xlsx" or ".xls" or ".csv" or ".xml";
+        }
+
+        // "*.xlsx" → filtre par extension
         if (pattern.StartsWith("*"))
         {
             var ext = pattern.TrimStart('*');
             return fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase);
         }
+
+        // Nom exact
         return fileName.Equals(pattern, StringComparison.OrdinalIgnoreCase);
     }
 }

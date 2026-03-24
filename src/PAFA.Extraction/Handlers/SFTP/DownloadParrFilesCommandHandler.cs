@@ -1,22 +1,24 @@
 ﻿using MediatR;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using PAFA.Domain.Entities;
-using PAFA.Domain.Enums;
 using PAFA.Domain.Interfaces;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
 using PAFA.Infrastructure.Sftp;
+using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace PAFA.Extraction.Commands.Sftp;
 
 /// <summary>
 /// Flux linéaire tout-en-un (CronJob / batch) :
 ///   SFTP Download → MinIO Upload → Parse → Validate → Insert DB
-/// Un seul IngestionJob en DB pour tout le batch.
-/// Pas de RabbitMQ, pas de consumer séparé.
+///
+/// Le CronJob envoie la commande SANS période → le handler prend
+/// TOUS les fichiers présents dans /upload et détecte la période
+/// depuis le nom de chaque fichier (ex: "MOD520A_Feb25.xlsx" → 2025-02).
 /// </summary>
-public sealed class DownloadParrFilesCommandHandler
+public sealed partial class DownloadParrFilesCommandHandler
     : IRequestHandler<DownloadParrFilesCommand, DownloadParrFilesResult>
 {
     private readonly ISftpFileSource _sftp;
@@ -45,9 +47,11 @@ public sealed class DownloadParrFilesCommandHandler
     public async Task<DownloadParrFilesResult> Handle(
         DownloadParrFilesCommand cmd, CancellationToken ct)
     {
-        _log.LogInformation(
-            "═══ SFTP Ingestion started — period {Year}-{Month:D2} ═══",
-            cmd.Year, cmd.Month);
+        _log.LogInformation("═══ SFTP Ingestion started ═══");
+        if (cmd.Year.HasValue && cmd.Month.HasValue)
+            _log.LogInformation("Forced period: {Year}-{Month:D2}", cmd.Year, cmd.Month);
+        else
+            _log.LogInformation("Period: auto-detect from filenames");
 
         var imported = new List<string>();
         var errors = new List<FileError>();
@@ -62,7 +66,7 @@ public sealed class DownloadParrFilesCommandHandler
                 imported, [new("SFTP", "Connection failed")]);
         }
 
-        // ── 2. List available files ──────────────────────────────
+        // ── 2. List ALL available files in /upload ───────────────
         var files = await _sftp.ListFilesAsync(
             _settings.RemotePath, _settings.FilePattern, ct);
 
@@ -73,7 +77,7 @@ public sealed class DownloadParrFilesCommandHandler
 
         if (!files.Any())
         {
-            _log.LogWarning("No files found in {Path}", _settings.RemotePath);
+            _log.LogInformation("No files found in {Path} — nothing to do.", _settings.RemotePath);
             return new DownloadParrFilesResult(true, 0, 0, 0, imported, errors);
         }
 
@@ -87,21 +91,27 @@ public sealed class DownloadParrFilesCommandHandler
 
             try
             {
-                // 3a. Download from SFTP into memory
+                // 3a. Detect period from filename (or use forced period)
+                var (periodYear, periodMonth) = ResolvePeriodForFile(
+                    file.FileName, cmd.Year, cmd.Month);
+                _log.LogInformation("Period for {File}: {Year}-{Month:D2}",
+                    file.FileName, periodYear, periodMonth);
+
+                // 3b. Download from SFTP into memory
                 var bytes = await _sftp.DownloadFileAsync(file.FullRemotePath, ct);
                 _log.LogInformation("Downloaded {Size:N0} bytes from SFTP", bytes.Length);
 
-                // 3b. Upload raw file to MinIO/Blob (landing zone)
+                // 3c. Upload raw file to MinIO/Blob (landing zone)
                 var blobPath = await _blob.UploadAsync(
                     file.FileName, bytes, "landing-zone", ct);
                 _log.LogInformation("📦 Saved to blob: {BlobPath}", blobPath);
 
-                // 3c. Parse → Validate → Insert (synchrone, même process)
+                // 3d. Parse → Validate → Insert (synchrone, même process)
                 var importResult = await _mediator.Send(new UploadParrFilesCommand(
                     FileName: file.FileName,
                     FileContent: bytes,
-                    PeriodYear: cmd.Year,
-                    PeriodMonth: cmd.Month,
+                    PeriodYear: periodYear,
+                    PeriodMonth: periodMonth,
                     UploadedBy: "SFTP_AUTO",
                     SourceSystem: DetectSourceSystem(file.FileName)), ct);
 
@@ -111,10 +121,8 @@ public sealed class DownloadParrFilesCommandHandler
                         "✅ {File} — {Valid} rows, {Read} read",
                         file.FileName, importResult.RowsValid, importResult.RowsRead);
 
-                    // Move SFTP file → /processed
                     var processed = $"{_settings.ProcessedPath}/{file.FileName}";
                     await _sftp.MoveFileAsync(file.FullRemotePath, processed, ct);
-
                     imported.Add(file.FileName);
                 }
                 else
@@ -123,8 +131,6 @@ public sealed class DownloadParrFilesCommandHandler
                         file.FileName, importResult.ErrorMessage);
                     errors.Add(new FileError(file.FileName,
                         importResult.ErrorMessage ?? "Import failed"));
-
-                    // Move SFTP file → /failed
                     await SafeMoveFailed(file.FullRemotePath, file.FileName, ct);
                 }
             }
@@ -148,6 +154,101 @@ public sealed class DownloadParrFilesCommandHandler
             ImportedFiles: imported,
             Errors: errors);
     }
+
+    // ════════════════════════════════════════════════════════════════
+    //  Period detection from filename
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// Resolves the reporting period for a file.
+    /// Priority: 1. Forced (CLI args)  2. Parsed from filename  3. Current month
+    ///
+    /// Supports patterns like:
+    ///   MOD520A_PAF_Reports_Feb25.xlsx        → 2025-02
+    ///   RPT_1364_January_2025.xlsx             → 2025-01
+    ///   PARR_2025_03_data.csv                  → 2025-03
+    ///   EUC09_202502.xlsx                      → 2025-02
+    /// </summary>
+    static (int year, int month) ResolvePeriodForFile(
+        string fileName, int? forcedYear, int? forcedMonth)
+    {
+        // Priority 1: Explicit period from CLI / env vars
+        if (forcedYear.HasValue && forcedMonth.HasValue)
+            return (forcedYear.Value, forcedMonth.Value);
+
+        // Priority 2: Detect from filename
+        var detected = DetectPeriodFromFileName(fileName);
+        if (detected.HasValue)
+            return detected.Value;
+
+        // Priority 3: Fallback = current month
+        var now = DateTime.UtcNow;
+        return (now.Year, now.Month);
+    }
+
+    static (int year, int month)? DetectPeriodFromFileName(string fileName)
+    {
+        var upper = fileName.ToUpperInvariant();
+
+        // Pattern 1: "Feb25", "January_2025", "Mar2025"
+        // Match 3-letter or full month name followed by 2 or 4 digit year
+        var monthNameMatch = MonthNamePattern().Match(upper);
+        if (monthNameMatch.Success)
+        {
+            var monthStr = monthNameMatch.Groups["month"].Value;
+            var yearStr = monthNameMatch.Groups["year"].Value;
+
+            if (TryParseMonthName(monthStr, out int month))
+            {
+                int year = yearStr.Length == 2
+                    ? 2000 + int.Parse(yearStr)
+                    : int.Parse(yearStr);
+                return (year, month);
+            }
+        }
+
+        // Pattern 2: "YYYY_MM" or "YYYYMM" (e.g. "2025_03", "202502")
+        var numericMatch = NumericDatePattern().Match(upper);
+        if (numericMatch.Success)
+        {
+            int year = int.Parse(numericMatch.Groups["year"].Value);
+            int month = int.Parse(numericMatch.Groups["month"].Value);
+            if (year is >= 2020 and <= 2040 && month is >= 1 and <= 12)
+                return (year, month);
+        }
+
+        return null;
+    }
+
+    static bool TryParseMonthName(string name, out int month)
+    {
+        // Try 3-letter abbreviation first, then full name
+        var formats = new[] { "MMM", "MMMM" };
+        foreach (var fmt in formats)
+        {
+            if (DateTime.TryParseExact(
+                    name, fmt,
+                    CultureInfo.InvariantCulture,
+                    DateTimeStyles.None,
+                    out var dt))
+            {
+                month = dt.Month;
+                return true;
+            }
+        }
+        month = 0;
+        return false;
+    }
+
+    [GeneratedRegex(@"(?<month>JAN(?:UARY)?|FEB(?:RUARY)?|MAR(?:CH)?|APR(?:IL)?|MAY|JUN(?:E)?|JUL(?:Y)?|AUG(?:UST)?|SEP(?:TEMBER)?|OCT(?:OBER)?|NOV(?:EMBER)?|DEC(?:EMBER)?)[_\-]?(?<year>\d{2,4})")]
+    private static partial Regex MonthNamePattern();
+
+    [GeneratedRegex(@"(?<year>20\d{2})[_\-]?(?<month>[01]\d)")]
+    private static partial Regex NumericDatePattern();
+
+    // ════════════════════════════════════════════════════════════════
+    //  Helpers
+    // ════════════════════════════════════════════════════════════════
 
     private async Task SafeMoveFailed(string remotePath, string fileName, CancellationToken ct)
     {

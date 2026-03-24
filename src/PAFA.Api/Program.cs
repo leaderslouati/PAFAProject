@@ -93,6 +93,7 @@ else
 
 builder.Services.AddScoped<IFileParser, ExcelFileParser>();
 builder.Services.AddScoped<IFileParser, CsvFileParser>();
+builder.Services.AddScoped<IFileParser, XmlFileParser>();
 builder.Services.AddScoped<FileParserFactory>();
 
 // ═══════════════════════════════════════════════════════════════════════
