@@ -35,7 +35,9 @@ public  class UploadParrFilesCommandHandler
             Status = IngestionJobStatus.Processing,
             FilesExpected = 1,
             StartedAt = DateTime.UtcNow,
-            TriggeredBy = JobTrigger.Manual
+            TriggeredBy = cmd.UploadedBy == "SHAREPOINT_AUTO"
+                                  ? JobTrigger.Scheduler
+                                  : JobTrigger.Manual
         };
         await _uow.IngestionJobs.AddAsync(job, ct);
 
@@ -45,6 +47,7 @@ public  class UploadParrFilesCommandHandler
             FileName = cmd.FileName,
             SourceSystem = cmd.SourceSystem,
             FileSizeBytes = cmd.FileContent.Length,
+            BlobPath = cmd.BlobPath,
             Status = IngestionFileStatus.Validating,
             ValidationStatus = ValidationStatus.Pending,
             DownloadedAt = DateTime.UtcNow

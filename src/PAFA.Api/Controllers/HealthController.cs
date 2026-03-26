@@ -10,25 +10,25 @@ namespace PAFA.Api.Controllers;
 /// Utilisé par Kubernetes liveness/readiness probes et monitoring.
 ///
 /// GET /api/health       ? check rapide (DB only)
-/// GET /api/health/full  ? check complet (DB + SFTP + MinIO)
+/// GET /api/health/full  ? check complet (DB + SharePoint + MinIO)
 /// </summary>
 [ApiController]
 [Route("api/health")]
 public class HealthController : ControllerBase
 {
     private readonly PafaDbContext _db;
-    private readonly ISftpFileSource _sftp;
+    private readonly IRemoteFileSource _fileSource;
     private readonly IBlobStorageService _blob;
     private readonly ILogger<HealthController> _log;
 
     public HealthController(
         PafaDbContext db,
-        ISftpFileSource sftp,
+        IRemoteFileSource fileSource,
         IBlobStorageService blob,
         ILogger<HealthController> log)
     {
         _db = db;
-        _sftp = sftp;
+        _fileSource = fileSource;
         _blob = blob;
         _log = log;
     }
@@ -61,15 +61,15 @@ public class HealthController : ControllerBase
     }
 
     /// <summary>
-    /// GET /api/health/full — check complet (DB + SFTP + MinIO).
+    /// GET /api/health/full — check complet (DB + SharePoint + MinIO).
     /// Utilisé avant de lancer une ingestion manuelle.
     /// </summary>
     [HttpGet("full")]
     public async Task<IActionResult> GetFullHealth(CancellationToken ct)
     {
         var dbOk = false;
-        var sftpOk = false;
-        var minioOk = false;
+        var fileSourceOk = false;
+        var blobOk = false;
 
         // 1. PostgreSQL
         try
@@ -81,27 +81,27 @@ public class HealthController : ControllerBase
             _log.LogError(ex, "Health check: DB failed");
         }
 
-        // 2. SFTP Xoserve
+        // 2. SharePoint Online
         try
         {
-            sftpOk = await _sftp.TestConnectionAsync(ct);
+            fileSourceOk = await _fileSource.TestConnectionAsync(ct);
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, "Health check: SFTP failed");
+            _log.LogError(ex, "Health check: SharePoint failed");
         }
 
         // 3. MinIO / Blob Storage
         try
         {
-            minioOk = await _blob.HealthCheckAsync(ct);
+            blobOk = await _blob.HealthCheckAsync(ct);
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "Health check: MinIO/Blob failed");
         }
 
-        var allOk = dbOk && sftpOk && minioOk;
+        var allOk = dbOk && fileSourceOk && blobOk;
         var result = new
         {
             status = allOk ? "healthy" : "degraded",
@@ -109,8 +109,8 @@ public class HealthController : ControllerBase
             checks = new
             {
                 database = dbOk,
-                sftp = sftpOk,
-                minio = minioOk
+                sharepoint = fileSourceOk,
+                blobStorage = blobOk
             }
         };
 

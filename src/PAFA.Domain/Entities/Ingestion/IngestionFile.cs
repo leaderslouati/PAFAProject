@@ -1,6 +1,6 @@
 ﻿using PAFA.Domain.Enums;
 
-namespace PAFA.Domain.Entities;
+namespace PAFA.Domain.Entities; 
 
 /// <summary>
 /// A single source file processed within an ingestion job.

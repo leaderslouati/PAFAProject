@@ -1,23 +1,23 @@
 ﻿using MediatR;
 using Microsoft.AspNetCore.Mvc;
-using PAFA.Extraction.Commands.Sftp;
+using PAFA.Extraction.Commands.SharePoint;
 
 namespace PAFA.Api.Controllers;
 
 [ApiController]
-[Route("api/sftp")]
-public class SftpController : ControllerBase
+[Route("api/ingest")]
+public class IngestionController : ControllerBase
 {
     private readonly IMediator _mediator;
-    public SftpController(IMediator mediator) => _mediator = mediator;
+    public IngestionController(IMediator mediator) => _mediator = mediator;
 
     /// <summary>
-    /// POST /api/sftp/ingest
-    /// Déclenche manuellement le téléchargement SFTP + import.
+    /// POST /api/ingest
+    /// Déclenche manuellement le téléchargement SharePoint + import.
     /// Si year/month ne sont pas fournis, la période est détectée
     /// automatiquement depuis le nom de chaque fichier Xoserve.
     /// </summary>
-    [HttpPost("ingest")]
+    [HttpPost]
     public async Task<IActionResult> Ingest(
         [FromQuery] int? year = null,
         [FromQuery] int? month = null,

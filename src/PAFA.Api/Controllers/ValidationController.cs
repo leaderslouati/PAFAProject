@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using PAFA.Domain.IRepository;
+using PAFA.Extraction.Commands.Validation;
 
 namespace PAFA.Api.Controllers;
 
@@ -104,42 +105,4 @@ public class ValidationController : ControllerBase
     }
 }
 
-// ?? DTOs ??????????????????????????????????????????????????????????
 
-public record ValidationErrorDto(
-    Guid Id,
-    int? LineNumber,
-    string? ColumnName,
-    string ErrorCode,
-    string ErrorMessage,
-    string? OriginalValue,
-    string Severity,
-    DateTime CreatedAt
-);
-
-public record ValidationErrorsResponse(
-    Guid FileId,
-    string FileName,
-    string ValidationStatus,
-    int TotalRows,
-    int ValidRows,
-    int RejectedRows,
-    int ErrorCount,
-    List<ValidationErrorDto> Errors
-);
-
-public record FileValidationSummary(
-    Guid FileId,
-    string FileName,
-    string ValidationStatus,
-    int TotalErrors,
-    int ValidRows,
-    int RejectedRows
-);
-
-public record JobValidationSummaryResponse(
-    Guid JobId,
-    int TotalFiles,
-    int TotalErrors,
-    List<FileValidationSummary> Files
-);

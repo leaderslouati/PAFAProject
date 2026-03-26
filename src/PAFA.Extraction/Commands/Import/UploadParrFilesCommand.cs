@@ -10,7 +10,8 @@ public record UploadParrFilesCommand(
     int PeriodYear,
     int PeriodMonth,
     string UploadedBy,
-    string SourceSystem = "MANUAL"
+    string SourceSystem = "MANUAL",
+    string? BlobPath = null
 ) : IRequest<UploadParrFilesResult>;
 
 public record UploadParrFilesResult(

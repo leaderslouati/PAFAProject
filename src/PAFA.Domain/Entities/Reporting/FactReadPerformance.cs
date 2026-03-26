@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace PAFA.Domain.Entities
+﻿namespace PAFA.Domain.Entities
 {
     // PAFA.Domain/Entities/FactReadPerformance.cs
     // Entité keyless — mappe sur la VIEW SQL, pas une table
@@ -17,6 +11,6 @@ namespace PAFA.Domain.Entities
         public decimal? EstimatedPct { get; set; }
         public decimal? CheckReadCount { get; set; }
         public decimal? TotalSites { get; set; }
-        public bool IsCompliant { get; set; }
+        public int IsCompliant { get; set; }
     }
 }

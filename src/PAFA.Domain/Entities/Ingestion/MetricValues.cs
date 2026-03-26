@@ -1,5 +1,4 @@
-﻿// PAFA.Domain/Entities/MetricValue.cs
-using PAFA.Domain.Entities;
+﻿using PAFA.Domain.Entities;
 
 public class MetricValue : BaseEntity
 {

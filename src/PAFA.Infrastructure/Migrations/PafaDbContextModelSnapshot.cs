@@ -104,230 +104,85 @@ namespace PAFA.Infrastructure.Migrations
                     b.ToTable("metric_values", (string)null);
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.DimCalendar", b =>
+            modelBuilder.Entity("PAFA.Domain.Entities.Authentication.PafaUser", b =>
                 {
-                    b.Property<string>("ReportMonth")
-                        .HasMaxLength(7)
-                        .HasColumnType("character varying(7)")
-                        .HasColumnName("report_month");
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("MonthLabel")
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasMaxLength(30)
-                        .HasColumnType("character varying(30)")
-                        .HasColumnName("month_label");
+                        .HasColumnType("text");
 
-                    b.Property<int>("MonthNum")
-                        .HasColumnType("integer")
-                        .HasColumnName("month_num");
-
-                    b.Property<string>("Quarter")
+                    b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(2)
-                        .HasColumnType("character varying(2)")
-                        .HasColumnName("quarter");
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
 
-                    b.Property<int>("Year")
-                        .HasColumnType("integer")
-                        .HasColumnName("year");
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
 
-                    b.HasKey("ReportMonth");
+                    b.Property<bool>("IsActive")
+                        .HasColumnType("boolean");
 
-                    b.ToTable("dim_calendar", (string)null);
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
 
-                    b.HasData(
-                        new
-                        {
-                            ReportMonth = "2024-01",
-                            MonthLabel = "January 2024",
-                            MonthNum = 1,
-                            Quarter = "Q1",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-02",
-                            MonthLabel = "February 2024",
-                            MonthNum = 2,
-                            Quarter = "Q1",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-03",
-                            MonthLabel = "March 2024",
-                            MonthNum = 3,
-                            Quarter = "Q1",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-04",
-                            MonthLabel = "April 2024",
-                            MonthNum = 4,
-                            Quarter = "Q2",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-05",
-                            MonthLabel = "May 2024",
-                            MonthNum = 5,
-                            Quarter = "Q2",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-06",
-                            MonthLabel = "June 2024",
-                            MonthNum = 6,
-                            Quarter = "Q2",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-07",
-                            MonthLabel = "July 2024",
-                            MonthNum = 7,
-                            Quarter = "Q3",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-08",
-                            MonthLabel = "August 2024",
-                            MonthNum = 8,
-                            Quarter = "Q3",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-09",
-                            MonthLabel = "September 2024",
-                            MonthNum = 9,
-                            Quarter = "Q3",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-10",
-                            MonthLabel = "October 2024",
-                            MonthNum = 10,
-                            Quarter = "Q4",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-11",
-                            MonthLabel = "November 2024",
-                            MonthNum = 11,
-                            Quarter = "Q4",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2024-12",
-                            MonthLabel = "December 2024",
-                            MonthNum = 12,
-                            Quarter = "Q4",
-                            Year = 2024
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-01",
-                            MonthLabel = "January 2025",
-                            MonthNum = 1,
-                            Quarter = "Q1",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-02",
-                            MonthLabel = "February 2025",
-                            MonthNum = 2,
-                            Quarter = "Q1",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-03",
-                            MonthLabel = "March 2025",
-                            MonthNum = 3,
-                            Quarter = "Q1",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-04",
-                            MonthLabel = "April 2025",
-                            MonthNum = 4,
-                            Quarter = "Q2",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-05",
-                            MonthLabel = "May 2025",
-                            MonthNum = 5,
-                            Quarter = "Q2",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-06",
-                            MonthLabel = "June 2025",
-                            MonthNum = 6,
-                            Quarter = "Q2",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-07",
-                            MonthLabel = "July 2025",
-                            MonthNum = 7,
-                            Quarter = "Q3",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-08",
-                            MonthLabel = "August 2025",
-                            MonthNum = 8,
-                            Quarter = "Q3",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-09",
-                            MonthLabel = "September 2025",
-                            MonthNum = 9,
-                            Quarter = "Q3",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-10",
-                            MonthLabel = "October 2025",
-                            MonthNum = 10,
-                            Quarter = "Q4",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-11",
-                            MonthLabel = "November 2025",
-                            MonthNum = 11,
-                            Quarter = "Q4",
-                            Year = 2025
-                        },
-                        new
-                        {
-                            ReportMonth = "2025-12",
-                            MonthLabel = "December 2025",
-                            MonthNum = 12,
-                            Quarter = "Q4",
-                            Year = 2025
-                        });
+                    b.Property<string>("LastName")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("PasswordHash")
+                        .IsRequired()
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<string>("Username")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Email")
+                        .IsUnique();
+
+                    b.HasIndex("Username")
+                        .IsUnique();
+
+                    b.ToTable("pafa_users", (string)null);
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.Authentication.PafaUserRole", b =>
+                {
+                    b.Property<Guid>("UserId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("RoleId")
+                        .HasColumnType("integer");
+
+                    b.HasKey("UserId", "RoleId");
+
+                    b.HasIndex("RoleId");
+
+                    b.ToTable("pafa_user_roles", (string)null);
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.FactReadPerformance", b =>
@@ -340,8 +195,8 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("numeric")
                         .HasColumnName("estimated_pct");
 
-                    b.Property<bool>("IsCompliant")
-                        .HasColumnType("boolean")
+                    b.Property<int>("IsCompliant")
+                        .HasColumnType("integer")
                         .HasColumnName("is_compliant");
 
                     b.Property<string>("ProductClass")
@@ -561,7 +416,7 @@ namespace PAFA.Infrastructure.Migrations
                     b.ToTable("ingestion_jobs", (string)null);
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.ProductClass", b =>
+            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ProductClass", b =>
                 {
                     b.Property<int>("Id")
                         .HasColumnType("integer");
@@ -962,6 +817,70 @@ namespace PAFA.Infrastructure.Migrations
                     b.ToTable("validation_errors", (string)null);
                 });
 
+            modelBuilder.Entity("PafaRole", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Description")
+                        .IsRequired()
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("Name")
+                        .IsUnique();
+
+                    b.HasIndex("Role")
+                        .IsUnique();
+
+                    b.ToTable("pafa_roles", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = 1,
+                            Description = "Gemserv analyst — read reports",
+                            Name = "PafaUser",
+                            Role = "PAFA_USER"
+                        },
+                        new
+                        {
+                            Id = 2,
+                            Description = "Admin full access",
+                            Name = "PafaAdmin",
+                            Role = "PAFA_ADMIN"
+                        },
+                        new
+                        {
+                            Id = 3,
+                            Description = "PAC access",
+                            Name = "PacMember",
+                            Role = "PAC_MEMBER"
+                        },
+                        new
+                        {
+                            Id = 4,
+                            Description = "Own data access",
+                            Name = "Shipper",
+                            Role = "SHIPPER"
+                        });
+                });
+
             modelBuilder.Entity("Shipper", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1136,6 +1055,25 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("IngestionFile");
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.Authentication.PafaUserRole", b =>
+                {
+                    b.HasOne("PafaRole", "Role")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("RoleId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("PAFA.Domain.Entities.Authentication.PafaUser", "User")
+                        .WithMany("UserRoles")
+                        .HasForeignKey("UserId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Role");
+
+                    b.Navigation("User");
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.IngestionFile", b =>
                 {
                     b.HasOne("PAFA.Domain.Entities.IngestionJob", "IngestionJob")
@@ -1170,7 +1108,7 @@ namespace PAFA.Infrastructure.Migrations
 
             modelBuilder.Entity("PAFA.Domain.Entities.ShipperProductClass", b =>
                 {
-                    b.HasOne("PAFA.Domain.Entities.ProductClass", "ProductClass")
+                    b.HasOne("PAFA.Domain.Entities.Referential.ProductClass", "ProductClass")
                         .WithMany("ShipperProductClasses")
                         .HasForeignKey("ProductClassId")
                         .OnDelete(DeleteBehavior.Restrict)
@@ -1198,6 +1136,11 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("IngestionFile");
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.Authentication.PafaUser", b =>
+                {
+                    b.Navigation("UserRoles");
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.IngestionFile", b =>
                 {
                     b.Navigation("MetricValues");
@@ -1212,7 +1155,7 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("RetryJobs");
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.ProductClass", b =>
+            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ProductClass", b =>
                 {
                     b.Navigation("ShipperProductClasses");
                 });
@@ -1220,6 +1163,11 @@ namespace PAFA.Infrastructure.Migrations
             modelBuilder.Entity("PAFA.Domain.Entities.ReportType", b =>
                 {
                     b.Navigation("Reports");
+                });
+
+            modelBuilder.Entity("PafaRole", b =>
+                {
+                    b.Navigation("UserRoles");
                 });
 
             modelBuilder.Entity("Shipper", b =>

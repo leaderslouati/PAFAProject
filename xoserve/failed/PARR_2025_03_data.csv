@@ -1,6 +1,0 @@
-Shipper Short Code,Reporting Period,Product Class,Read Performance Pct,Estimated Read Pct,Total Site Count,Check Read Count,No Read Count,AQ Correction Count,Energy Theft Count,Unread Site Count,Meter Read Frequency,Data Quality Score,Supplier Region,Network Code,Gas Transporter,Meter Asset Manager,Shipper Full Name,Contract Type,Billing Status,Last Read Date,Next Read Date,Annual Quantity,Daily Quantity,Site Category,Priority Flag
-SSE,Mar-25,1,89.09,9.91,16807,3519,391,67,0,287,Monthly,85.7,North West,LDZ-07,National Grid,MAM-UK,SSE Energy Solutions,Domestic,Active,2025-03-15,2025-03-28,17116,144.43,Residential,N
-BGT,Mar-25,1,98.45,9.11,14532,1917,345,69,1,230,Monthly,97.3,South East,LDZ-04,National Grid,MAM-UK,British Gas Trading,Domestic,Active,2025-03-15,2025-03-28,10500,11.62,Residential,N
-OVO,Mar-25,1,96.31,7.8,24475,2907,142,37,5,191,Monthly,86.5,Midlands,LDZ-03,National Grid,MAM-UK,OVO Energy,Domestic,Active,2025-03-15,2025-03-28,42336,91.03,Residential,N
-EON,Mar-25,1,92.64,3.31,29308,2411,131,41,3,142,Monthly,95.7,Yorkshire,LDZ-06,National Grid,MAM-UK,E.ON Next,Domestic,Active,2025-03-15,2025-03-28,22564,61.28,Residential,N
-NPW,Mar-25,1,90.45,8.62,17272,3906,306,50,5,279,Monthly,97.4,North East,LDZ-04,National Grid,MAM-UK,npower,Domestic,Active,2025-03-15,2025-03-28,7219,10.06,Residential,N

@@ -1,5 +1,6 @@
 ﻿using System;
 using Microsoft.EntityFrameworkCore.Migrations;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
@@ -8,26 +9,11 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace PAFA.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitialCreate : Migration
+    public partial class InitUserRoleFixed : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.CreateTable(
-                name: "dim_calendar",
-                columns: table => new
-                {
-                    report_month = table.Column<string>(type: "character varying(7)", maxLength: 7, nullable: false),
-                    year = table.Column<int>(type: "integer", nullable: false),
-                    month_num = table.Column<int>(type: "integer", nullable: false),
-                    month_label = table.Column<string>(type: "character varying(30)", maxLength: 30, nullable: false),
-                    quarter = table.Column<string>(type: "character varying(2)", maxLength: 2, nullable: false)
-                },
-                constraints: table =>
-                {
-                    table.PrimaryKey("PK_dim_calendar", x => x.report_month);
-                });
-
             migrationBuilder.CreateTable(
                 name: "ingestion_jobs",
                 columns: table => new
@@ -63,6 +49,44 @@ namespace PAFA.Infrastructure.Migrations
                         principalTable: "ingestion_jobs",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.SetNull);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "pafa_roles",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    Name = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Role = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Description = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_pafa_roles", x => x.Id);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "pafa_users",
+                columns: table => new
+                {
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
+                    Username = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    Email = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: false),
+                    PasswordHash = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
+                    FirstName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    LastName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_pafa_users", x => x.Id);
                 });
 
             migrationBuilder.CreateTable(
@@ -170,6 +194,30 @@ namespace PAFA.Infrastructure.Migrations
                         name: "FK_ingestion_files_ingestion_jobs_IngestionJobId",
                         column: x => x.IngestionJobId,
                         principalTable: "ingestion_jobs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
+                name: "pafa_user_roles",
+                columns: table => new
+                {
+                    UserId = table.Column<Guid>(type: "uuid", nullable: false),
+                    RoleId = table.Column<int>(type: "integer", nullable: false)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_pafa_user_roles", x => new { x.UserId, x.RoleId });
+                    table.ForeignKey(
+                        name: "FK_pafa_user_roles_pafa_roles_RoleId",
+                        column: x => x.RoleId,
+                        principalTable: "pafa_roles",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Restrict);
+                    table.ForeignKey(
+                        name: "FK_pafa_user_roles_pafa_users_UserId",
+                        column: x => x.UserId,
+                        principalTable: "pafa_users",
                         principalColumn: "Id",
                         onDelete: ReferentialAction.Cascade);
                 });
@@ -311,34 +359,14 @@ namespace PAFA.Infrastructure.Migrations
                 });
 
             migrationBuilder.InsertData(
-                table: "dim_calendar",
-                columns: new[] { "report_month", "month_label", "month_num", "quarter", "year" },
+                table: "pafa_roles",
+                columns: new[] { "Id", "Description", "Name", "Role" },
                 values: new object[,]
                 {
-                    { "2024-01", "January 2024", 1, "Q1", 2024 },
-                    { "2024-02", "February 2024", 2, "Q1", 2024 },
-                    { "2024-03", "March 2024", 3, "Q1", 2024 },
-                    { "2024-04", "April 2024", 4, "Q2", 2024 },
-                    { "2024-05", "May 2024", 5, "Q2", 2024 },
-                    { "2024-06", "June 2024", 6, "Q2", 2024 },
-                    { "2024-07", "July 2024", 7, "Q3", 2024 },
-                    { "2024-08", "August 2024", 8, "Q3", 2024 },
-                    { "2024-09", "September 2024", 9, "Q3", 2024 },
-                    { "2024-10", "October 2024", 10, "Q4", 2024 },
-                    { "2024-11", "November 2024", 11, "Q4", 2024 },
-                    { "2024-12", "December 2024", 12, "Q4", 2024 },
-                    { "2025-01", "January 2025", 1, "Q1", 2025 },
-                    { "2025-02", "February 2025", 2, "Q1", 2025 },
-                    { "2025-03", "March 2025", 3, "Q1", 2025 },
-                    { "2025-04", "April 2025", 4, "Q2", 2025 },
-                    { "2025-05", "May 2025", 5, "Q2", 2025 },
-                    { "2025-06", "June 2025", 6, "Q2", 2025 },
-                    { "2025-07", "July 2025", 7, "Q3", 2025 },
-                    { "2025-08", "August 2025", 8, "Q3", 2025 },
-                    { "2025-09", "September 2025", 9, "Q3", 2025 },
-                    { "2025-10", "October 2025", 10, "Q4", 2025 },
-                    { "2025-11", "November 2025", 11, "Q4", 2025 },
-                    { "2025-12", "December 2025", 12, "Q4", 2025 }
+                    { 1, "Gemserv analyst — read reports", "PafaUser", "PAFA_USER" },
+                    { 2, "Admin full access", "PafaAdmin", "PAFA_ADMIN" },
+                    { 3, "PAC access", "PacMember", "PAC_MEMBER" },
+                    { 4, "Own data access", "Shipper", "SHIPPER" }
                 });
 
             migrationBuilder.InsertData(
@@ -438,6 +466,35 @@ namespace PAFA.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
+                name: "IX_pafa_roles_Name",
+                table: "pafa_roles",
+                column: "Name",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_pafa_roles_Role",
+                table: "pafa_roles",
+                column: "Role",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_pafa_user_roles_RoleId",
+                table: "pafa_user_roles",
+                column: "RoleId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_pafa_users_Email",
+                table: "pafa_users",
+                column: "Email",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
+                name: "IX_pafa_users_Username",
+                table: "pafa_users",
+                column: "Username",
+                unique: true);
+
+            migrationBuilder.CreateIndex(
                 name: "ix_pc_code",
                 table: "product_classes",
                 column: "Code",
@@ -475,52 +532,50 @@ namespace PAFA.Infrastructure.Migrations
                 name: "ix_valerr_file",
                 table: "validation_errors",
                 column: "IngestionFileId");
-           
-            // Dans le fichier migration généré — ajouter dans Up()
-            migrationBuilder.Sql(@"
-                CREATE VIEW fact_read_performance AS
-                SELECT
-                    TO_CHAR(mv.reporting_period, 'YYYY-MM')   AS report_month,
-                    mv.shipper_short_code                      AS shipper_code,
-                    mv.product_class_code                      AS product_class,
-                    MAX(CASE WHEN mv.metric_key = 'read_performance_pct'
-                             THEN mv.value END)                AS read_perf_pct,
-                    MAX(CASE WHEN mv.metric_key = 'estimated_read_pct'
-                             THEN mv.value END)                AS estimated_pct,
-                    MAX(CASE WHEN mv.metric_key = 'check_read_count'
-                             THEN mv.value END)                AS check_read_count,
-                    MAX(CASE WHEN mv.metric_key = 'total_site_count'
-                             THEN mv.value END)                AS total_sites,
-                    CASE
-                        WHEN mv.product_class_code = 'PC1'
-                             AND MAX(CASE WHEN mv.metric_key = 'read_performance_pct'
-                                          THEN mv.value END) >= 97.5
-                        THEN TRUE
-                        WHEN mv.product_class_code = 'PC2'
-                             AND MAX(CASE WHEN mv.metric_key = 'read_performance_pct'
-                                          THEN mv.value END) >= 80.0
-                        THEN TRUE
-                        ELSE FALSE
-                    END                                        AS is_compliant
-                FROM metric_values mv
-                WHERE mv.product_class_code IS NOT NULL
-                GROUP BY
-                    mv.reporting_period,
-                    mv.shipper_short_code,
-                    mv.product_class_code;
-            ");
 
-           
+            migrationBuilder.Sql(@"
+            CREATE OR REPLACE VIEW fact_read_performance AS
+            SELECT
+                TO_CHAR(""ReportingPeriod""::timestamptz, 'YYYY-MM') AS report_month,
+                ""ShipperShortCode""                                   AS shipper_code,
+                product_class_code                                     AS product_class,
+                MAX(CASE WHEN ""MetricKey"" = 'read_performance_pct'
+                         THEN ""Value"" END)                           AS read_perf_pct,
+                MAX(CASE WHEN ""MetricKey"" = 'estimated_read_pct'
+                         THEN ""Value"" END)                           AS estimated_pct,
+                MAX(CASE WHEN ""MetricKey"" = 'check_read_count'
+                         THEN ""Value"" END)                           AS check_read_count,
+                MAX(CASE WHEN ""MetricKey"" = 'total_site_count'
+                         THEN ""Value"" END)                           AS total_sites,
+                CAST(
+                    CASE
+                        WHEN product_class_code = 'PC1'
+                             AND MAX(CASE WHEN ""MetricKey"" = 'read_performance_pct'
+                                         THEN ""Value"" END) >= 97.5
+                            THEN 1
+                        WHEN product_class_code = 'PC2'
+                             AND MAX(CASE WHEN ""MetricKey"" = 'read_performance_pct'
+                                         THEN ""Value"" END) >= 80.0
+                            THEN 1
+                        ELSE 0
+                    END
+                AS INTEGER)                                            AS is_compliant
+            FROM metric_values mv
+            WHERE product_class_code IS NOT NULL
+            GROUP BY ""ReportingPeriod"", ""ShipperShortCode"", product_class_code;
+        ");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.DropTable(
-                name: "dim_calendar");
+            migrationBuilder.Sql("DROP VIEW IF EXISTS fact_read_performance;");
 
             migrationBuilder.DropTable(
                 name: "metric_values");
+
+            migrationBuilder.DropTable(
+                name: "pafa_user_roles");
 
             migrationBuilder.DropTable(
                 name: "reports");
@@ -530,6 +585,12 @@ namespace PAFA.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "validation_errors");
+
+            migrationBuilder.DropTable(
+                name: "pafa_roles");
+
+            migrationBuilder.DropTable(
+                name: "pafa_users");
 
             migrationBuilder.DropTable(
                 name: "report_types");
@@ -545,9 +606,6 @@ namespace PAFA.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "ingestion_jobs");
-
-            // Et dans Down() pour rollback propre
-            migrationBuilder.Sql("DROP VIEW IF EXISTS fact_read_performance;");
         }
     }
 }

@@ -9,7 +9,7 @@ using PAFA.Infrastructure.Parsing;
 using PAFA.Infrastructure.Persistence;
 using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
-using PAFA.Infrastructure.Sftp;
+using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Storage;
 using PAFA.Reports.Handlers;
 using PAFA.Reports.Writers;
@@ -67,12 +67,14 @@ builder.Services.AddScoped<IReportRepository,        ReportRepository>();
 builder.Services.AddScoped<IMetricValueRepository,   MetricValueRepository>();
 
 // ═══════════════════════════════════════════════════════════════════════
-//  SFTP — kept for manual import via SftpController (Swagger)
+//  SHAREPOINT — Source de fichiers PARR (Microsoft Graph)
 // ═══════════════════════════════════════════════════════════════════════
 
-builder.Services.Configure<SftpSettings>(
-    builder.Configuration.GetSection(SftpSettings.SectionName));
-builder.Services.AddScoped<ISftpFileSource, SftpFileDownloader>();
+builder.Services.Configure<SharePointSettings>(
+    builder.Configuration.GetSection(SharePointSettings.SectionName));
+builder.Services.AddScoped<IRemoteFileSource, SharePointFileSource>();
+builder.Services.AddScoped<IFileSourceSettings>(sp =>
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SharePointSettings>>().Value);
 
 // ═══════════════════════════════════════════════════════════════════════
 //  BLOB STORAGE
@@ -171,7 +173,7 @@ app.MapHub<PAFA.Api.Hubs.IngestionHub>("/hubs/ingestion");
 // ═══════════════════════════════════════════════════════════════════════
 
 var logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("PAFA API started — Blob: {Provider}", blobProvider);
-logger.LogInformation("Ingestion: via PAFA.BatchReports CronJob or POST /api/sftp/ingest");
+logger.LogInformation("PAFA API started — Blob: {Provider}, FileSource: SharePoint", blobProvider);
+logger.LogInformation("Ingestion: via PAFA.BatchReports CronJob or POST /api/ingest");
 
 app.Run();

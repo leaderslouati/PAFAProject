@@ -5,7 +5,7 @@
 //   ✓ Hérite désormais de BaseEntity (audit + RowVersion)
 //   ✓ Navigation ShipperProductClasses déjà présente — OK
 // ═══════════════════════════════════════════════════════════
-namespace PAFA.Domain.Entities;
+namespace PAFA.Domain.Entities.Referential;
 
 /// <summary>
 /// UNC gas product class (PC1 to PC4).

@@ -39,10 +39,7 @@ public class ImportController(IMediator mediator, IUnitOfWork uow) : ControllerB
     [HttpGet("{fileId}/errors")]
     public async Task<IActionResult> GetValidationErrors(Guid fileId)
     {
-        // IIngestionFileRepository n'a pas GetValidationErrorsAsync — 
-        // on passe par IBaseRepository
-        var errors = await uow.IngestionFiles
-            .FindAsync(e => e.Id == fileId);
+        var errors = await uow.IngestionFiles.FindAsync(e => e.Id == fileId);
 
         if (!errors.Any()) return NotFound();
 

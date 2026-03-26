@@ -6,25 +6,7 @@ include:
 
 services:
   # ═══════════════════════════════════════════════════════════════
-  #  1. SFTP SERVER — simule Xoserve
-  # ═══════════════════════════════════════════════════════════════
-  pafa-sftp:
-    image: atmoz/sftp
-    container_name: pafa_sftp
-    ports:
-      - "2222:22"
-    volumes:
-      - ./xoserve/upload:/home/xoserve/upload
-      - ./xoserve/processed:/home/xoserve/processed
-      - ./xoserve/failed:/home/xoserve/failed
-    command: xoserve:xoserve_pass:1001
-    networks:
-      default:
-        aliases:
-          - pafa_sftp
-
-  # ═══════════════════════════════════════════════════════════════
-  #  2. MINIO — simule Azure Blob Storage
+  #  1. MINIO — simule Azure Blob Storage
   # ═══════════════════════════════════════════════════════════════
   minio:
     image: minio/minio:latest
@@ -45,7 +27,7 @@ services:
       retries: 5
 
   # ═══════════════════════════════════════════════════════════════
-  #  3. BATCH — profil "batch" (ne démarre pas avec 'docker compose up')
+  #  2. BATCH — profil "batch" (ne démarre pas avec 'docker compose up')
   #
   #  Lancement :
   #    docker compose run --rm pafa-batch --once
@@ -62,10 +44,10 @@ services:
     environment:
       - DOTNET_ENVIRONMENT=Production
       - PAFA_ConnectionStrings__DefaultConnection=Host=db;Port=5432;Database=pafadb;Username=postgres;Password=postgres
-      - PAFA_Sftp__Host=pafa_sftp
-      - PAFA_Sftp__Port=22
-      - PAFA_Sftp__Username=xoserve
-      - PAFA_Sftp__Password=xoserve_pass
+      - PAFA_SharePoint__TenantId=${SP_TENANT_ID}
+      - PAFA_SharePoint__ClientId=${SP_CLIENT_ID}
+      - PAFA_SharePoint__ClientSecret=${SP_CLIENT_SECRET}
+      - PAFA_SharePoint__SiteId=${SP_SITE_ID}
       - PAFA_BlobStorage__Provider=MinIO
       - PAFA_BlobStorage__Endpoint=pafa_minio:9000
       - PAFA_BlobStorage__AccessKey=minioadmin

@@ -7,6 +7,8 @@
 //   ✓ PeriodYear + PeriodMonth remplacés par DateOnly ReportingPeriod
 //     → clé composite : ShipperId + ProductClassId + ReportingPeriod
 // ═══════════════════════════════════════════════════════════
+using PAFA.Domain.Entities.Referential;
+
 namespace PAFA.Domain.Entities;
 
 /// <summary>

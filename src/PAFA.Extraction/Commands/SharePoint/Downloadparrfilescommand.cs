@@ -1,20 +1,21 @@
 ﻿using MediatR;
 
-namespace PAFA.Extraction.Commands.Sftp;
+namespace PAFA.Extraction.Commands.SharePoint;
 
 /// <summary>
 /// Déclenche le téléchargement de TOUS les fichiers PARR disponibles
-/// sur le SFTP Xoserve, puis les traite un par un.
+/// depuis la source distante (SharePoint Online), puis les traite un par un.
 ///
-/// La période est optionnelle :
-///   - Si fournie (ex: --year 2025 --month 2) → utilisée pour tous les fichiers
-///   - Si absente (null) → détectée automatiquement depuis le nom de chaque fichier
-///     Ex: "MOD520A_PAF_Reports_Feb25.xlsx" → 2025-02
+/// La période est déterminée par le chemin du dossier SharePoint ({Année}/{Mois}).
+///   - Si fournie (ex: --year 2025 --month 7) → lit /{year}/{month:D2}/
+///   - Si absente (null) → lit le dossier du mois UTC courant
+///
+/// Le nom du fichier n'est jamais utilisé pour déduire la période.
 /// </summary>
 public sealed record DownloadParrFilesCommand(
     int? Year = null,
     int? Month = null,
-    /// <summary>Null = tous les fichiers disponibles.</summary>
+    /// <summary>Null = tous les fichiers disponibles dans le dossier période.</summary>
     List<string>? FileNameFilter = null
 ) : IRequest<DownloadParrFilesResult>;
 

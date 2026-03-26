@@ -8,12 +8,12 @@ using PAFA.Domain.Interfaces;
 using PAFA.Domain.IRepository;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
-using PAFA.Extraction.Commands.Sftp;
+using PAFA.Extraction.Commands.SharePoint;
 using PAFA.Infrastructure.Parsing;
 using PAFA.Infrastructure.Persistence;
 using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
-using PAFA.Infrastructure.Sftp;
+using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Storage;
 using PAFA.Reports.Batch.Configuration;
 using PAFA.Reports.Batch.Core;
@@ -24,24 +24,23 @@ namespace PAFA.BatchReports;
 /// Single entry point for the PAFA data pipeline.
 //
 // Modes:
-//   --ingest                     : Process ALL files in SFTP /upload (period auto-detected from filename)
-//   --ingest --year N --month N  : Force period for all files
-//   --reports                    : Generate PDF/Excel from existing DB data
-//   --once                       : Full pipeline (ingest + reports)
-// </summary>
+//   --ingest                     : Traite tous les fichiers dans SharePoint /{year}/{month:D2}/
+//   --ingest --year N --month N  : Force la période (ex: --year 2025 --month 7)
+//   --reports                    : Génère les rapports PDF/Excel depuis la DB
+//   (aucun argument)             : Pipeline complet — ingest + reports
+/// </summary>
 class Program
 {
     static async Task<int> Main(string[] args)
     {
         try
         {
-            // Period is now OPTIONAL — null means "detect from filenames"
             var (year, month) = ResolvePeriod(args);
 
             if (year.HasValue && month.HasValue)
-                Console.WriteLine($"[PAFA Batch] Forced period: {year}-{month:D2}");
+                Console.WriteLine($"[PAFA Batch] Période forcée : {year}-{month:D2}");
             else
-                Console.WriteLine("[PAFA Batch] Period: auto-detect from filenames");
+                Console.WriteLine($"[PAFA Batch] Période : mois courant UTC ({DateTime.UtcNow:yyyy-MM})");
 
             var host = CreateHostBuilder(args, year, month).Build();
 
@@ -90,21 +89,27 @@ class Program
     static async Task<int> RunIngestionAsync(
         IServiceScope scope, ILogger logger, int? year, int? month)
     {
-        logger.LogInformation("═══ SFTP Ingestion: process all files in /upload ═══");
+        var now = DateTime.UtcNow;
+        var targetYear  = year  ?? now.Year;
+        var targetMonth = month ?? now.Month;
+
+        logger.LogInformation(
+            "═══ SharePoint Ingestion — dossier source : /{Year}/{Month:D2}/ ═══",
+            targetYear, targetMonth);
         try
         {
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
             var result = await mediator.Send(new DownloadParrFilesCommand(year, month));
 
             logger.LogInformation(
-                "Ingestion complete — {Downloaded} downloaded, {Imported} imported, {Failed} failed",
+                "Ingestion terminée — {Downloaded} téléchargés, {Imported} importés, {Failed} en erreur",
                 result.FilesDownloaded, result.FilesImported, result.FilesFailed);
 
             return result.FilesFailed > 0 && result.FilesImported == 0 ? 1 : 0;
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Ingestion phase failed");
+            logger.LogError(ex, "Ingestion échouée");
             return 1;
         }
     }
@@ -150,7 +155,7 @@ class Program
             int.TryParse(envMonth, out int em) && em is >= 1 and <= 12)
             return (ey, em);
 
-        // 3. No period specified → auto-detect from filenames
+        // 3. No period specified → use current UTC month (folder-based detection)
         return (null, null);
     }
 
@@ -204,9 +209,12 @@ class Program
                 services.AddScoped<IReportRepository,        ReportRepository>();
                 services.AddScoped<IMetricValueRepository,   MetricValueRepository>();
 
-                services.Configure<SftpSettings>(
-                    context.Configuration.GetSection(SftpSettings.SectionName));
-                services.AddScoped<ISftpFileSource, SftpFileDownloader>();
+                // ── SharePoint — Source de fichiers PARR ────────────────
+                services.Configure<SharePointSettings>(
+                    context.Configuration.GetSection(SharePointSettings.SectionName));
+                services.AddScoped<IRemoteFileSource, SharePointFileSource>();
+                services.AddScoped<IFileSourceSettings>(sp =>
+                    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SharePointSettings>>().Value);
 
                 services.Configure<BlobStorageSettings>(
                     context.Configuration.GetSection(BlobStorageSettings.SectionName));
