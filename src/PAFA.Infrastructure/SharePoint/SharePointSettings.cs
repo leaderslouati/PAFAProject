@@ -24,7 +24,7 @@ public class SharePointSettings : IFileSourceSettings
     /// <summary>Secret client (utiliser Azure Key Vault en production).</summary>
     public string ClientSecret { get; set; } = string.Empty;
 
-    /// <summary>URL du site SharePoint (ex: https://talan0.sharepoint.com/sites/PAFA-POC).</summary>
+    /// <summary>URL du site SharePoint </summary>
     public string SiteUrl { get; set; } = string.Empty;
 
     /// <summary>
@@ -50,4 +50,30 @@ public class SharePointSettings : IFileSourceSettings
 
     /// <summary>Pattern de fichiers à traiter.</summary>
     public string FilePattern { get; set; } = "*.xlsx";
+
+    /// <summary>
+    /// Authorised PARR file name prefixes — mapped from appsettings.json.
+    /// Backed by a List<string> for JSON binding; exposed as IReadOnlyList via the interface.
+    /// </summary>
+    public List<string> AllowedFilePrefixesList { get; set; } =
+    [
+        "MOD520A", "RPT_1364", "MOD700", "EUC09", "TRANSFER", "CLASS4AQ"
+    ];
+
+    /// <summary>
+    /// Authorised file extensions (lower-case, with dot) — mapped from appsettings.json.
+    /// </summary>
+    public List<string> AllowedExtensionsList { get; set; } =
+    [
+        ".xlsx", ".xls", ".csv", ".xml"
+    ];
+
+    /// <summary>
+    /// When true (default), enforces strict {BaseInboundPath}/{YYYY}/{MM} folder structure.
+    /// </summary>
+    public bool EnforceYearMonthFolderStructure { get; set; } = true;
+
+    // ?? IFileSourceSettings explicit implementations ??????????????
+    IReadOnlyList<string> IFileSourceSettings.AllowedFilePrefixes => AllowedFilePrefixesList;
+    IReadOnlyList<string> IFileSourceSettings.AllowedExtensions   => AllowedExtensionsList;
 }

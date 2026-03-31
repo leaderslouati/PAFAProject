@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PAFA.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using PAFA.Infrastructure.Persistence;
 namespace PAFA.Infrastructure.Migrations
 {
     [DbContext(typeof(PafaDbContext))]
-    partial class PafaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260326213916_Update-User")]
+    partial class UpdateUser
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -525,166 +528,6 @@ namespace PAFA.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.Referential.Shipper", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Email")
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsActive")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("boolean")
-                        .HasDefaultValue(true)
-                        .HasColumnName("is_active");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("LegalEntity")
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("legal_entity");
-
-                    b.Property<DateOnly?>("MarketEntryDate")
-                        .HasColumnType("date");
-
-                    b.Property<DateOnly?>("MarketExitDate")
-                        .HasColumnType("date");
-
-                    b.Property<string>("Name")
-                        .IsRequired()
-                        .HasMaxLength(150)
-                        .HasColumnType("character varying(150)")
-                        .HasColumnName("name");
-
-                    b.Property<int?>("PortfolioSize")
-                        .HasColumnType("integer");
-
-                    b.Property<byte[]>("RowVersion")
-                        .HasColumnType("bytea");
-
-                    b.Property<string>("ShortCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("short_code");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ShortCode")
-                        .IsUnique()
-                        .HasDatabaseName("ix_shipper_short_code");
-
-                    b.ToTable("shippers", (string)null);
-                });
-
-            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperAlias", b =>
-                {
-                    b.Property<int>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("integer");
-
-                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
-
-                    b.Property<string>("AliasCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("alias_code");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<byte[]>("RowVersion")
-                        .HasColumnType("bytea");
-
-                    b.Property<Guid>("ShipperId")
-                        .HasColumnType("uuid");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("ShipperId");
-
-                    b.ToTable("shipperAlias", (string)null);
-                });
-
-            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperProductClass", b =>
-                {
-                    b.Property<Guid>("ShipperId")
-                        .HasColumnType("uuid");
-
-                    b.Property<int>("ProductClassId")
-                        .HasColumnType("integer");
-
-                    b.Property<DateOnly>("ReportingPeriod")
-                        .HasColumnType("date");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bytea")
-                        .HasDefaultValueSql("decode('', 'hex')");
-
-                    b.Property<int?>("SupplyPointCount")
-                        .HasColumnType("integer");
-
-                    b.Property<decimal?>("TotalAQ_MWH")
-                        .HasColumnType("numeric(14,4)");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
-
-                    b.HasKey("ShipperId", "ProductClassId", "ReportingPeriod");
-
-                    b.HasIndex("ProductClassId");
-
-                    b.ToTable("shipper_product_classes", (string)null);
-                });
-
             modelBuilder.Entity("PAFA.Domain.Entities.Report", b =>
                 {
                     b.Property<Guid>("Id")
@@ -870,6 +713,54 @@ namespace PAFA.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.ShipperProductClass", b =>
+                {
+                    b.Property<Guid>("ShipperId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int>("ProductClassId")
+                        .HasColumnType("integer");
+
+                    b.Property<DateOnly>("ReportingPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("bytea")
+                        .HasDefaultValueSql("decode('', 'hex')");
+
+                    b.Property<int?>("SupplyPointCount")
+                        .HasColumnType("integer");
+
+                    b.Property<decimal?>("TotalAQ_MWH")
+                        .HasColumnType("numeric(14,4)");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.HasKey("ShipperId", "ProductClassId", "ReportingPeriod");
+
+                    b.HasIndex("ProductClassId");
+
+                    b.ToTable("shipper_product_classes", (string)null);
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.ValidationError", b =>
                 {
                     b.Property<Guid>("Id")
@@ -1001,6 +892,165 @@ namespace PAFA.Infrastructure.Migrations
                         });
                 });
 
+            modelBuilder.Entity("Shipper", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Email")
+                        .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("LegalEntity")
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("legal_entity");
+
+                    b.Property<DateOnly?>("MarketEntryDate")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("MarketExitDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(150)
+                        .HasColumnType("character varying(150)")
+                        .HasColumnName("name");
+
+                    b.Property<int?>("PortfolioSize")
+                        .HasColumnType("integer");
+
+                    b.Property<byte[]>("RowVersion")
+                        .HasColumnType("bytea");
+
+                    b.Property<string>("ShortCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("short_code");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ShortCode")
+                        .IsUnique()
+                        .HasDatabaseName("ix_shipper_short_code");
+
+                    b.ToTable("shippers", (string)null);
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000001"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Alpha Gas Limited",
+                            Name = "Alpha Gas Ltd",
+                            ShortCode = "SHIP_A"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000002"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Beta Energy PLC",
+                            Name = "Beta Energy plc",
+                            ShortCode = "SHIP_B"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000003"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Gamma Supply Limited",
+                            Name = "Gamma Supply Ltd",
+                            ShortCode = "SHIP_C"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000004"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Delta Gas Company",
+                            Name = "Delta Gas Co",
+                            ShortCode = "SHIP_D"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000005"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Epsilon Energy Ltd",
+                            Name = "Epsilon Energy",
+                            ShortCode = "SHIP_E"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000006"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Zeta Gas Limited",
+                            Name = "Zeta Gas Ltd",
+                            ShortCode = "SHIP_F"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000007"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Eta Supply PLC",
+                            Name = "Eta Supply plc",
+                            ShortCode = "SHIP_G"
+                        },
+                        new
+                        {
+                            Id = new Guid("a0000001-0000-0000-0000-000000000008"),
+                            CreatedAt = new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc),
+                            CreatedBy = "SEED",
+                            IsActive = true,
+                            IsDeleted = false,
+                            LegalEntity = "Theta Gas Corporation",
+                            Name = "Theta Gas Corp",
+                            ShortCode = "SHIP_H"
+                        });
+                });
+
             modelBuilder.Entity("MetricValue", b =>
                 {
                     b.HasOne("PAFA.Domain.Entities.IngestionFile", "IngestionFile")
@@ -1009,7 +1059,7 @@ namespace PAFA.Infrastructure.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("PAFA.Domain.Entities.Referential.Shipper", null)
+                    b.HasOne("Shipper", null)
                         .WithMany("MetricValues")
                         .HasForeignKey("ShipperId");
 
@@ -1056,36 +1106,6 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("ParentJob");
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperAlias", b =>
-                {
-                    b.HasOne("PAFA.Domain.Entities.Referential.Shipper", "Shipper")
-                        .WithMany()
-                        .HasForeignKey("ShipperId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.Navigation("Shipper");
-                });
-
-            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperProductClass", b =>
-                {
-                    b.HasOne("PAFA.Domain.Entities.Referential.ProductClass", "ProductClass")
-                        .WithMany("ShipperProductClasses")
-                        .HasForeignKey("ProductClassId")
-                        .OnDelete(DeleteBehavior.Restrict)
-                        .IsRequired();
-
-                    b.HasOne("PAFA.Domain.Entities.Referential.Shipper", "Shipper")
-                        .WithMany("ProductClasses")
-                        .HasForeignKey("ShipperId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("ProductClass");
-
-                    b.Navigation("Shipper");
-                });
-
             modelBuilder.Entity("PAFA.Domain.Entities.Report", b =>
                 {
                     b.HasOne("PAFA.Domain.Entities.ReportType", "ReportType")
@@ -1095,6 +1115,25 @@ namespace PAFA.Infrastructure.Migrations
                         .IsRequired();
 
                     b.Navigation("ReportType");
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.ShipperProductClass", b =>
+                {
+                    b.HasOne("PAFA.Domain.Entities.Referential.ProductClass", "ProductClass")
+                        .WithMany("ShipperProductClasses")
+                        .HasForeignKey("ProductClassId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Shipper", "Shipper")
+                        .WithMany("ProductClasses")
+                        .HasForeignKey("ShipperId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("ProductClass");
+
+                    b.Navigation("Shipper");
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.ValidationError", b =>
@@ -1132,13 +1171,6 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("ShipperProductClasses");
                 });
 
-            modelBuilder.Entity("PAFA.Domain.Entities.Referential.Shipper", b =>
-                {
-                    b.Navigation("MetricValues");
-
-                    b.Navigation("ProductClasses");
-                });
-
             modelBuilder.Entity("PAFA.Domain.Entities.ReportType", b =>
                 {
                     b.Navigation("Reports");
@@ -1147,6 +1179,13 @@ namespace PAFA.Infrastructure.Migrations
             modelBuilder.Entity("PafaRole", b =>
                 {
                     b.Navigation("UserRoles");
+                });
+
+            modelBuilder.Entity("Shipper", b =>
+                {
+                    b.Navigation("MetricValues");
+
+                    b.Navigation("ProductClasses");
                 });
 #pragma warning restore 612, 618
         }

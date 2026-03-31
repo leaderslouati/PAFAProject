@@ -1,5 +1,4 @@
-﻿using PAFA.Domain.Entities;
-
+﻿namespace PAFA.Domain.Entities.Referential;
 public class Shipper : BaseEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();

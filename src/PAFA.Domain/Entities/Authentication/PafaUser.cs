@@ -8,6 +8,8 @@ public class PafaUser : BaseEntity
     public string PasswordHash { get; set; } = string.Empty;
     public string FirstName { get; set; } = string.Empty;
     public string LastName { get; set; } = string.Empty;
+    public string? JobTitle { get; set; }
+    public string? Department { get; set; }
     public bool IsActive { get; set; } = true;
 
     // Navigation

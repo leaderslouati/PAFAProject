@@ -26,6 +26,8 @@ public class PafaUserConfiguration : IEntityTypeConfiguration<PafaUser>
         b.Property(u => u.PasswordHash).IsRequired().HasMaxLength(500);
         b.Property(u => u.FirstName).HasMaxLength(100);
         b.Property(u => u.LastName).HasMaxLength(100);
+        b.Property(u => u.JobTitle).HasMaxLength(150);
+        b.Property(u => u.Department).HasMaxLength(150);
         b.Property(u => u.RowVersion).IsRowVersion();
         b.HasQueryFilter(u => !u.IsDeleted);
        

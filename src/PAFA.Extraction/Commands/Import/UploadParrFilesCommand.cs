@@ -1,4 +1,5 @@
 ﻿using MediatR;
+using PAFA.Domain.Enums;
 
 namespace PAFA.Extraction.Commands.Import;
 
@@ -10,8 +11,12 @@ public record UploadParrFilesCommand(
     int PeriodYear,
     int PeriodMonth,
     string UploadedBy,
-    string SourceSystem = "MANUAL",
-    string? BlobPath = null
+    string SourceSystem  = "MANUAL",
+    string? BlobPath     = null,
+    string TriggerSource = "MANUAL_API",
+    Guid? ParentJobId    = null,
+    int RetryCount       = 0,
+    JobTrigger JobTrigger = JobTrigger.Manual
 ) : IRequest<UploadParrFilesResult>;
 
 public record UploadParrFilesResult(

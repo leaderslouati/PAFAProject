@@ -1,6 +1,7 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PAFA.Domain.Entities;
+using PAFA.Domain.Entities.Referential;
 
 namespace PAFA.Infrastructure.EntityConfigurations;
 

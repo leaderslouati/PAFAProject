@@ -1,20 +1,8 @@
-// ═══════════════════════════════════════════════════════════
-// PAFA.Domain/Entities/ShipperProductClass.cs
-//
-// CORRECTIONS :
-//   ✓ Hérite désormais de BaseEntity (supprime le CreatedAt
-//     en doublon qui était dans la classe)
-//   ✓ PeriodYear + PeriodMonth remplacés par DateOnly ReportingPeriod
-//     → clé composite : ShipperId + ProductClassId + ReportingPeriod
-// ═══════════════════════════════════════════════════════════
-using PAFA.Domain.Entities.Referential;
-
-namespace PAFA.Domain.Entities;
+namespace PAFA.Domain.Entities.Referential;
 
 /// <summary>
 /// Many-to-many between Shipper and ProductClass.
 /// Contains monthly portfolio metrics per shipper per product class.
-/// Composite PK: ShipperId + ProductClassId + ReportingPeriod.
 /// </summary>
 public class ShipperProductClass : BaseEntity
 {

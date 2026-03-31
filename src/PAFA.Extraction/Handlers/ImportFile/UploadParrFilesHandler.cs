@@ -5,13 +5,21 @@ using PAFA.Domain.Enums;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Mapping;
 using PAFA.Extraction.Validation;
+using PAFA.Extraction.Validations;
 using PAFA.Infrastructure.Parsing;
 
 namespace PAFA.Extraction.Commands.Import;
 
-public  class UploadParrFilesCommandHandler
+public class UploadParrFilesCommandHandler
     : IRequestHandler<UploadParrFilesCommand, UploadParrFilesResult>
 {
+    // ── Well-known prefixes used when no IFileSourceSettings is available ──
+    private static readonly IReadOnlyList<string> DefaultAllowedPrefixes =
+        ["MOD520A", "RPT_1364", "MOD700", "EUC09", "TRANSFER", "CLASS4AQ"];
+
+    private static readonly IReadOnlyList<string> DefaultAllowedExtensions =
+        [".xlsx", ".xls", ".csv", ".xml"];
+
     private readonly IUnitOfWork _uow;
     private readonly FileParserFactory _factory;
     private readonly ILogger<UploadParrFilesCommandHandler> _log;
@@ -27,17 +35,46 @@ public  class UploadParrFilesCommandHandler
         _log.LogInformation("Import démarré — {File}", cmd.FileName);
         var period = new DateOnly(cmd.PeriodYear, cmd.PeriodMonth, 1);
 
+        // ── VAL-001 / NAME-001..004 : file name convention pre-check ──────
+        // Applied before creating any DB record so no partial ingestion_file
+        // row is left on a naming violation.
+        var nameValidation = FileNameValidator.Validate(
+            cmd.FileName, DefaultAllowedPrefixes, DefaultAllowedExtensions);
+
+        if (!nameValidation.IsValid)
+        {
+            var summary = string.Join("; ",
+                nameValidation.Findings
+                    .Where(f => f.Severity == "ERROR")
+                    .Select(f => $"[{f.RuleId}] {f.Message}"));
+
+            _log.LogWarning("File name rejected — {File} | {Summary}", cmd.FileName, summary);
+
+            // Return failure without touching the database
+            return new UploadParrFilesResult(
+                Success: false,
+                JobId: Guid.Empty,
+                FileId: Guid.Empty,
+                FileName: cmd.FileName,
+                RowsRead: 0, RowsValid: 0, RowsRejected: 0,
+                ErrorMessage: $"File name validation failed: {summary}");
+        }
+
+        // Log warnings (e.g. month token unreadable) but continue
+        foreach (var w in nameValidation.Findings.Where(f => f.Severity == "WARNING"))
+            _log.LogWarning("[{RuleId}] {File} — {Msg}", w.RuleId, cmd.FileName, w.Message);
+
         // ── 1. Créer IngestionJob + IngestionFile ─────────────────
         var job = new IngestionJob
         {
-            JobName = $"PARR_{cmd.PeriodYear}_{cmd.PeriodMonth:D2}",
+            JobName         = $"PARR_{cmd.PeriodYear}_{cmd.PeriodMonth:D2}",
             ReportingPeriod = period,
-            Status = IngestionJobStatus.Processing,
-            FilesExpected = 1,
-            StartedAt = DateTime.UtcNow,
-            TriggeredBy = cmd.UploadedBy == "SHAREPOINT_AUTO"
-                                  ? JobTrigger.Scheduler
-                                  : JobTrigger.Manual
+            Status          = IngestionJobStatus.Processing,
+            FilesExpected   = 1,
+            StartedAt       = DateTime.UtcNow,
+            TriggeredBy     = cmd.JobTrigger,
+            ParentJobId     = cmd.ParentJobId,
+            RetryCount      = cmd.RetryCount
         };
         await _uow.IngestionJobs.AddAsync(job, ct);
 
@@ -58,7 +95,17 @@ public  class UploadParrFilesCommandHandler
         try
         {
             // ── 2. Parser ─────────────────────────────────────────
-            var parser = _factory.GetParser(cmd.FileName);
+            IFileParser parser;
+            try
+            {
+                parser = _factory.GetParser(cmd.FileName);
+            }
+            catch (NotSupportedException nse)
+            {
+                _log.LogWarning(nse, "Unsupported file format: {File}", cmd.FileName);
+                return await Fail(job, file, nse.Message, 0, 0, 0, ct);
+            }
+
             using var ms = new MemoryStream(cmd.FileContent);
             var parsed = await parser.ParseAsync(ms, cmd.FileName, ct);
 
@@ -71,10 +118,10 @@ public  class UploadParrFilesCommandHandler
             var validator = new ImportValidationService(knownCodes);
             var validation = validator.Validate(parsed, cmd.FileName, isAnonymised: false);
 
-            // ── 4. Persister les erreurs (US_0a) ──────────────────
+            // ── 4. Persister les erreurs ──────────────────────────
             if (validation.Findings.Any())
             {
-                var errors = validation.Findings.Select(f => new ValidationError
+                var dbErrors = validation.Findings.Select(f => new ValidationError
                 {
                     IngestionFileId = file.Id,
                     LineNumber = f.RowNumber > 0 ? f.RowNumber : null,
@@ -84,7 +131,7 @@ public  class UploadParrFilesCommandHandler
                     OriginalValue = f.FieldValue,
                     Severity = f.Severity.ToString().ToUpperInvariant()
                 }).ToList();
-                await _uow.IngestionFiles.AddValidationErrorsAsync(file.Id, errors, ct);
+                await _uow.IngestionFiles.AddValidationErrorsAsync(file.Id, dbErrors, ct);
             }
 
             // ── 5. Erreurs bloquantes → réponse echec ─────────────
@@ -98,7 +145,7 @@ public  class UploadParrFilesCommandHandler
                     parsed.TotalRows, validation.ValidRowCount, validation.InvalidRowCount, ct);
             }
 
-            // ── 6. Mapper → MetricValues (EAV) ───────────────────
+            // ── 6. Mapper → MetricValues ──────────────────────────
             var badRows = validation.Findings
                 .Where(f => f.Severity == ValidationSeverity.Error && f.RowNumber > 0)
                 .Select(f => f.RowNumber).ToHashSet();
@@ -107,8 +154,6 @@ public  class UploadParrFilesCommandHandler
             foreach (var row in parsed.Rows)
             {
                 if (badRows.Contains(row.RowNumber)) continue;
-
-                // Une ligne Excel → N MetricValues (une par colonne numérique)
                 metrics.AddRange(MetricValueMapper.MapToMetricValues(
                     row, file.Id, period, cmd.UploadedBy));
             }
@@ -138,11 +183,8 @@ public  class UploadParrFilesCommandHandler
                 validation.ValidRowCount, metrics.Count);
 
             return new UploadParrFilesResult(
-                Success: true,
-                JobId: job.Id,
-                FileId: file.Id,
-                FileName: cmd.FileName,
-                RowsRead: parsed.TotalRows,
+                Success: true, JobId: job.Id, FileId: file.Id,
+                FileName: cmd.FileName, RowsRead: parsed.TotalRows,
                 RowsValid: validation.ValidRowCount,
                 RowsRejected: validation.InvalidRowCount,
                 ErrorMessage: null);

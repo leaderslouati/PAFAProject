@@ -3,7 +3,7 @@
 // ════════════════════════════════════════════════════════════
 using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
-using PAFA.Domain.Entities;
+
 using PAFA.Domain.Entities.Authentication;
 using PAFA.Domain.Entities.Referential;
 using PAFA.Infrastructure.EntityConfigurations;
@@ -22,6 +22,7 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     public DbSet<Shipper> Shippers => Set<Shipper>();
     public DbSet<ProductClass> ProductClasses => Set<ProductClass>();
     public DbSet<ShipperProductClass> ShipperProductClasses => Set<ShipperProductClass>();
+    public DbSet<ShipperAlias> ShipperAliases => Set<ShipperAlias>();
 
     // ── Ingestion ───────────────────────────────────────────
     public DbSet<IngestionJob> IngestionJobs => Set<IngestionJob>();
@@ -48,6 +49,7 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
         modelBuilder.ApplyConfiguration(new PafaRoleConfiguration());
         modelBuilder.ApplyConfiguration(new PafaUserConfiguration());
         modelBuilder.ApplyConfiguration(new PafaUserRoleConfiguration());
+        modelBuilder.ApplyConfiguration(new ShipperAliasConfiguration());
 
         // Power BI configurations
         modelBuilder.ApplyConfiguration(new FactReadPerformanceConfiguration());

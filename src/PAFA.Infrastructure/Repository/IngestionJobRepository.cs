@@ -22,5 +22,12 @@ namespace PAFA.Infrastructure.Repositories;
 
         public Task<IReadOnlyList<MetricDefinition>> GetMetricDefinitionsAsync(CancellationToken ct = default)
             => Task.FromResult<IReadOnlyList<MetricDefinition>>(new List<MetricDefinition>());
+
+        /// <inheritdoc />
+        public async Task<IngestionJob?> GetLatestByPeriodAsync(int year, int month, CancellationToken ct = default)
+            => await _ctx.IngestionJobs
+                .Where(j => j.ReportingPeriod == new DateOnly(year, month, 1))
+                .OrderByDescending(j => j.StartedAt)
+                .FirstOrDefaultAsync(ct);
     }
 
