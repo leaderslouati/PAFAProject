@@ -1,50 +1,52 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using Microsoft.Graph.Models;
 using PAFA.Domain.Entities;
 
 namespace PAFA.Infrastructure.Persistence.Configurations;
 
 public class MetricValueConfiguration : IEntityTypeConfiguration<MetricValue>
 {
-    public void Configure(EntityTypeBuilder<MetricValue> b)
+    public void Configure(EntityTypeBuilder<MetricValue> entity)
     {
-        b.ToTable("metric_values");
+        entity.ToTable("metric_values");
 
-        b.HasKey(x => x.Id);
-        b.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
+        entity.HasKey(e => e.Id);
 
-        b.Property(x => x.ReportingPeriod).IsRequired().HasColumnType("date");
-        b.Property(x => x.ShipperShortCode).IsRequired().HasMaxLength(10);
-        b.Property(x => x.MetricKey).IsRequired().HasMaxLength(60);
-        b.Property(x => x.Value).HasColumnType("numeric(12,4)");
-        b.Property(x => x.ProductClassCode)
-                .HasColumnName("product_class_code")
-                .HasMaxLength(10);
+        entity.Property(e => e.ShipperShortCode)
+              .IsRequired()
+              .HasMaxLength(20);
 
-        // ── Contrainte unicité : évite les doublons à l'import ──────
-        // Un seul enregistrement par shipper / période / métrique / fichier
-        b.HasIndex(x => new {
-            x.IngestionFileId,
-            x.ShipperShortCode,
-            x.ReportingPeriod,
-            x.MetricKey
-        })
-            .IsUnique()
-            .HasDatabaseName("ix_mv_unique");
+        entity.Property(e => e.MetricKey)
+              .IsRequired()
+              .HasMaxLength(50);
 
-        // ── Index pour requêtes Power BI ────────────────────────────
-        b.HasIndex(x => x.ReportingPeriod).HasDatabaseName("ix_mv_period");
-        b.HasIndex(x => x.ShipperShortCode).HasDatabaseName("ix_mv_ssc");
-        b.HasIndex(x => x.MetricKey).HasDatabaseName("ix_mv_metric_key");
-        b.HasIndex(x => new { x.ReportingPeriod, x.MetricKey })
-            .HasDatabaseName("ix_mv_period_key");
-        // ← NOUVEAU index pour filtrage Power BI
-        b.HasIndex(x => x.ProductClassCode)
-               .HasDatabaseName("ix_mv_product_class");
-        // ── Relation FK → IngestionFile ─────────────────────────────
-        b.HasOne(x => x.IngestionFile)
-            .WithMany(x => x.MetricValues)
-            .HasForeignKey(x => x.IngestionFileId)
-            .OnDelete(DeleteBehavior.Cascade);
+        entity.Property(e => e.Value)
+              .HasColumnType("numeric(18,6)");
+
+        entity.Property(e => e.ProductClassCode)
+              .HasMaxLength(10);
+
+        // FK nullable vers Shipper (transition : ShipperShortCode → ShipperId)
+        entity.Property(e => e.ShipperId)
+              .IsRequired(false);
+
+        entity.HasIndex(e => e.ShipperId)
+              .HasDatabaseName("IX_metric_values_ShipperId");
+
+        entity.HasOne(e => e.Shipper)
+              .WithMany(s => s.MetricValues)
+              .HasForeignKey(e => e.ShipperId)
+              .OnDelete(DeleteBehavior.SetNull)
+              .IsRequired(false);
+
+        entity.HasOne(e => e.IngestionFile)
+              .WithMany(f => f.MetricValues)
+              .HasForeignKey(e => e.IngestionFileId)
+              .OnDelete(DeleteBehavior.Cascade);
+
+        // Index de performance pour les requêtes par période/shipper/metric
+        entity.HasIndex(e => new { e.ReportingPeriod, e.ShipperShortCode, e.MetricKey })
+              .HasDatabaseName("IX_metric_values_Period_Shipper_MetricKey");
     }
 }

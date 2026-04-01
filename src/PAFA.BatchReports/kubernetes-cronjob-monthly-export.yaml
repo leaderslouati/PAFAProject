@@ -1,0 +1,140 @@
+# =============================================================================
+# PAFA Monthly Power BI Export — Kubernetes CronJob
+#
+# Responsabilité : exporter les 41 rapports Power BI en PDF chaque 1er du mois.
+#   1. Refresh des datasets Import-mode (Power BI REST API)
+#   2. Export PDF de chaque rapport (polling asynchrone)
+#   3. Upload vers Azure Blob Storage / MinIO
+#   4. Sauvegarde metadata dans PostgreSQL (table reports)
+#
+# ⚠️ NE PAS CONFONDRE avec pafa-ingestion-cronjob (jours 18-21) :
+#   - pafa-ingestion-cronjob  → --ingest    → SharePoint → DB (18-21 du mois)
+#   - pafa-monthly-export     → --powerbi-export → Power BI → Blob (1er du mois)
+#
+# ─── LOCAL (Docker Desktop Kubernetes) ────────────────────────────────────────
+#   1. Builder l'image :
+#        docker build -t pafa-batch:local -f src/PAFA.BatchReports/Dockerfile .
+#
+#   2. Déployer le CronJob :
+#        kubectl apply -f src/PAFA.BatchReports/kubernetes-cronjob-monthly-export.yaml
+#
+#   3. Lancer manuellement (ne pas attendre le 1er du mois) :
+#        kubectl create job pafa-export-test-01 --from=cronjob/pafa-monthly-export
+#
+#   4. Voir les logs :
+#        kubectl logs -f job/pafa-export-test-01
+#
+#   5. Nettoyer :
+#        kubectl delete job pafa-export-test-01
+#        kubectl delete cronjob pafa-monthly-export
+#
+# ─── PRODUCTION (AKS) ────────────────────────────────────────────────────────
+#   kubectl apply -f src/PAFA.BatchReports/kubernetes-cronjob-monthly-export.yaml
+#   kubectl create job pafa-export-manual-$(date +%s) \
+#     --from=cronjob/pafa-monthly-export --namespace pafa
+# =============================================================================
+
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: pafa-monthly-export
+  namespace: pafa
+  labels:
+    app: pafa-batch
+    component: powerbi-export
+spec:
+  # ── 1er de chaque mois à 02:00 UTC ──────────────────────────
+  schedule: "0 2 1 * *"
+  timeZone: "UTC"
+
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  concurrencyPolicy: Forbid
+  # Si le cluster était down le 1er, relancer dans les 12h suivantes
+  startingDeadlineSeconds: 43200
+
+  jobTemplate:
+    spec:
+      # Max 1 retry — si ça échoue 2 fois, investigation manuelle requise
+      backoffLimit: 1
+      # Timeout global : 30 min (refresh ~10min + 41 exports ~15min)
+      activeDeadlineSeconds: 1800
+      template:
+        metadata:
+          labels:
+            app: pafa-batch
+            component: powerbi-export
+        spec:
+          restartPolicy: OnFailure
+
+          containers:
+          - name: pafa-export
+            image: your-registry.azurecr.io/pafa-batch:latest
+            imagePullPolicy: Always
+
+            # ── POWER BI EXPORT UNIQUEMENT ──
+            args: ["--powerbi-export"]
+
+            resources:
+              requests:
+                memory: "256Mi"
+                cpu: "250m"
+              limits:
+                memory: "512Mi"
+                cpu: "500m"
+
+            env:
+            - name: DOTNET_ENVIRONMENT
+              value: "Production"
+
+            # ── Power BI credentials (via Kubernetes Secrets) ──
+            - name: PAFA_PowerBi__TenantId
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: powerbi-tenant-id
+            - name: PAFA_PowerBi__ClientId
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: powerbi-client-id
+            - name: PAFA_PowerBi__ClientSecret
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: powerbi-client-secret
+            - name: PAFA_PowerBi__WorkspaceId
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: powerbi-workspace-id
+
+            # ── Database ──
+            - name: PAFA_ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: db-connection
+
+            # ── Blob Storage (MinIO en local, Azure Blob en prod) ──
+            - name: PAFA_BlobStorage__Provider
+              value: "MinIO"
+            - name: PAFA_BlobStorage__Endpoint
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: minio-endpoint
+                  optional: true
+            - name: PAFA_BlobStorage__AccessKey
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: minio-access-key
+                  optional: true
+            - name: PAFA_BlobStorage__SecretKey
+              valueFrom:
+                secretKeyRef:
+                  name: pafa-secrets
+                  key: minio-secret-key
+                  optional: true

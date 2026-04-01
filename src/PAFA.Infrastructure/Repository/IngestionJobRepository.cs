@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
+using PAFA.Domain.Enums;
 using PAFA.Domain.IRepository;
 using PAFA.Infrastructure.Persistence;
 
@@ -29,5 +30,11 @@ namespace PAFA.Infrastructure.Repositories;
                 .Where(j => j.ReportingPeriod == new DateOnly(year, month, 1))
                 .OrderByDescending(j => j.StartedAt)
                 .FirstOrDefaultAsync(ct);
+
+        /// <inheritdoc />
+        public Task<bool> IsAlreadyCompletedAsync(int year, int month, CancellationToken ct = default)
+            => _ctx.IngestionJobs
+                .AnyAsync(j => j.ReportingPeriod == new DateOnly(year, month, 1)
+                            && j.Status == IngestionJobStatus.Completed, ct);
     }
 

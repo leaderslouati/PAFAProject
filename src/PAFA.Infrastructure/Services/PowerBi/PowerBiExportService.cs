@@ -49,7 +49,7 @@ public sealed class PowerBiExportService(
         return new EmbedTokenResult(
             EmbedUrl:    report.EmbedUrl,
             EmbedToken:  tokenResponse.Token,
-            ExpiresAt:   tokenResponse.Expiration ?? DateTimeOffset.UtcNow.AddHours(1),
+            ExpiresAt:   new DateTimeOffset(tokenResponse.Expiration, TimeSpan.Zero),
             ReportId:    reportId,
             WorkspaceId: settings.WorkspaceId);
     }
@@ -74,7 +74,7 @@ public sealed class PowerBiExportService(
 
         // ── 1. Kick off the export ──────────────────────────────────
         var exportRequest = BuildExportRequest(audience, aliasCode, fileFormat);
-        var exportJob     = await client.Reports
+        var exportJob = await client.Reports
             .ExportToFileInGroupAsync(groupId, Guid.Parse(reportId), exportRequest);
 
         logger.LogInformation(
@@ -97,15 +97,15 @@ public sealed class PowerBiExportService(
                 "Export poll — ExportId={ExportId} Status={Status} Progress={Progress}%",
                 exportJob.Id, status.Status, status.PercentComplete);
 
-            if (status.Status is "Succeeded" or "Failed")
+            if (status.Status is ExportState.Succeeded or ExportState.Failed)
                 break;
         }
 
-        if (status?.Status != "Succeeded")
+        if (status?.Status != ExportState.Succeeded)
         {
             throw new InvalidOperationException(
                 $"Power BI export did not complete successfully. " +
-                $"Final status: {status?.Status ?? "Timeout"}. ExportId: {exportJob.Id}");
+                $"Final status: {status?.Status?.ToString() ?? "Timeout"}. ExportId: {exportJob.Id}");
         }
 
         // ── 3. Download the file stream ────────────────────────────
@@ -188,8 +188,11 @@ public sealed class PowerBiExportService(
 
         return new ExportReportRequest
         {
-            Format     = fileFormat,
-            Identities = [identity]
+            Format                            = fileFormat,
+            PowerBIReportConfiguration        = new PowerBIReportExportConfiguration
+            {
+                Identities = [identity]
+            }
         };
     }
 

@@ -9,7 +9,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace PAFA.Infrastructure.Migrations
 {
     /// <inheritdoc />
-    public partial class InitUserRoleFixed : Migration
+    public partial class AddNewViewReport : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -76,6 +76,8 @@ namespace PAFA.Infrastructure.Migrations
                     PasswordHash = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     FirstName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     LastName = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    JobTitle = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
+                    Department = table.Column<string>(type: "character varying(150)", maxLength: 150, nullable: true),
                     IsActive = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "text", nullable: false),
@@ -226,31 +228,41 @@ namespace PAFA.Infrastructure.Migrations
                 name: "reports",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ReportTypeId = table.Column<int>(type: "integer", nullable: false),
                     ScheduleNumber = table.Column<int>(type: "integer", nullable: false),
-                    Title = table.Column<string>(type: "character varying(300)", maxLength: 300, nullable: false),
+                    Title = table.Column<string>(type: "character varying(500)", maxLength: 500, nullable: false),
                     ReportingPeriod = table.Column<DateOnly>(type: "date", nullable: false),
-                    Audience = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
-                    Status = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    Audience = table.Column<int>(type: "integer", nullable: false),
+                    Status = table.Column<int>(type: "integer", nullable: false),
                     GeneratedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     PublishedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     FilePath_PDF = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     FilePath_Excel = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
                     FilePath_PPTX = table.Column<string>(type: "character varying(1000)", maxLength: 1000, nullable: true),
-                    CommentaryText = table.Column<string>(type: "character varying(5000)", maxLength: 5000, nullable: true),
+                    CommentaryText = table.Column<string>(type: "text", nullable: true),
                     CommentaryBy = table.Column<string>(type: "character varying(200)", maxLength: 200, nullable: true),
+                    ObservationsText = table.Column<string>(type: "text", nullable: true, comment: "Observations mensuelles saisies manuellement par l'analyste PAFA."),
+                    ObservationsBy = table.Column<string>(type: "character varying(256)", maxLength: 256, nullable: true, comment: "Identifiant (UPN/email) de l'analyste."),
+                    ObservationsUpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true, comment: "Horodatage UTC de la dernière mise à jour des observations."),
+                    IngestionJobId = table.Column<Guid>(type: "uuid", nullable: true),
                     IsBaseline = table.Column<bool>(type: "boolean", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
                     UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true)
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
                     table.PrimaryKey("PK_reports", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_reports_ingestion_jobs_IngestionJobId",
+                        column: x => x.IngestionJobId,
+                        principalTable: "ingestion_jobs",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                     table.ForeignKey(
                         name: "FK_reports_report_types_ReportTypeId",
                         column: x => x.ReportTypeId,
@@ -267,13 +279,18 @@ namespace PAFA.Infrastructure.Migrations
                     ProductClassId = table.Column<int>(type: "integer", nullable: false),
                     ReportingPeriod = table.Column<DateOnly>(type: "date", nullable: false),
                     SupplyPointCount = table.Column<int>(type: "integer", nullable: true),
-                    TotalAQ_MWH = table.Column<decimal>(type: "numeric(14,4)", nullable: true),
+                    TotalAQ_MWH = table.Column<decimal>(type: "numeric", nullable: true),
+                    EstimatedPct = table.Column<decimal>(type: "numeric(8,4)", nullable: true, comment: "% lectures estimées (0-100). Source: MetricKey='EstimatedPct'."),
+                    CheckReadCountNotCompleted = table.Column<int>(type: "integer", nullable: true, comment: "Nb check reads non complétés. >= 0."),
+                    ReadPerfPct = table.Column<decimal>(type: "numeric(8,4)", nullable: true, comment: "% global de performance lecture (0-100)."),
+                    NoMeterCount = table.Column<int>(type: "integer", nullable: true, comment: "Nb SP sans meter enregistré. >= 0."),
+                    NoMeterPct = table.Column<decimal>(type: "numeric(8,4)", nullable: true, comment: "% SP sans meter. PC1/PC2 = 0."),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
-                    CreatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
-                    UpdatedBy = table.Column<string>(type: "character varying(100)", maxLength: 100, nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
                     IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
-                    RowVersion = table.Column<byte[]>(type: "bytea", rowVersion: true, nullable: true, defaultValueSql: "decode('', 'hex')")
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
                 },
                 constraints: table =>
                 {
@@ -293,18 +310,47 @@ namespace PAFA.Infrastructure.Migrations
                 });
 
             migrationBuilder.CreateTable(
+                name: "shipperAlias",
+                columns: table => new
+                {
+                    Id = table.Column<int>(type: "integer", nullable: false)
+                        .Annotation("Npgsql:ValueGenerationStrategy", NpgsqlValueGenerationStrategy.IdentityByDefaultColumn),
+                    ShipperId = table.Column<Guid>(type: "uuid", nullable: false),
+                    AliasCode = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    ValidFrom = table.Column<DateOnly>(type: "date", nullable: false),
+                    ValidTo = table.Column<DateOnly>(type: "date", nullable: true),
+                    IsActive = table.Column<bool>(type: "boolean", nullable: false, defaultValue: true),
+                    CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
+                    CreatedBy = table.Column<string>(type: "text", nullable: false),
+                    UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
+                    UpdatedBy = table.Column<string>(type: "text", nullable: true),
+                    IsDeleted = table.Column<bool>(type: "boolean", nullable: false),
+                    RowVersion = table.Column<byte[]>(type: "bytea", nullable: true)
+                },
+                constraints: table =>
+                {
+                    table.PrimaryKey("PK_shipperAlias", x => x.Id);
+                    table.ForeignKey(
+                        name: "FK_shipperAlias_shippers_ShipperId",
+                        column: x => x.ShipperId,
+                        principalTable: "shippers",
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.Cascade);
+                });
+
+            migrationBuilder.CreateTable(
                 name: "metric_values",
                 columns: table => new
                 {
-                    Id = table.Column<Guid>(type: "uuid", nullable: false, defaultValueSql: "gen_random_uuid()"),
+                    Id = table.Column<Guid>(type: "uuid", nullable: false),
                     ReportingPeriod = table.Column<DateOnly>(type: "date", nullable: false),
-                    ShipperShortCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: false),
-                    MetricKey = table.Column<string>(type: "character varying(60)", maxLength: 60, nullable: false),
-                    Value = table.Column<decimal>(type: "numeric(12,4)", nullable: false),
-                    TextValue = table.Column<string>(type: "text", nullable: true),
-                    product_class_code = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
-                    IngestionFileId = table.Column<Guid>(type: "uuid", nullable: false),
                     ShipperId = table.Column<Guid>(type: "uuid", nullable: true),
+                    ShipperShortCode = table.Column<string>(type: "character varying(20)", maxLength: 20, nullable: false),
+                    MetricKey = table.Column<string>(type: "character varying(50)", maxLength: 50, nullable: false),
+                    Value = table.Column<decimal>(type: "numeric(18,6)", nullable: false),
+                    TextValue = table.Column<string>(type: "text", nullable: true),
+                    ProductClassCode = table.Column<string>(type: "character varying(10)", maxLength: 10, nullable: true),
+                    IngestionFileId = table.Column<Guid>(type: "uuid", nullable: false),
                     CreatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     CreatedBy = table.Column<string>(type: "text", nullable: false),
                     UpdatedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: true),
@@ -325,7 +371,8 @@ namespace PAFA.Infrastructure.Migrations
                         name: "FK_metric_values_shippers_ShipperId",
                         column: x => x.ShipperId,
                         principalTable: "shippers",
-                        principalColumn: "Id");
+                        principalColumn: "Id",
+                        onDelete: ReferentialAction.SetNull);
                 });
 
             migrationBuilder.CreateTable(
@@ -389,21 +436,6 @@ namespace PAFA.Infrastructure.Migrations
                     { 2, "PAC", "SCH2B", new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SYSTEM", true, false, "Performance Assurance Committee (Non-Anonymised)", 22, null, "Schedule 2B", null, null }
                 });
 
-            migrationBuilder.InsertData(
-                table: "shippers",
-                columns: new[] { "Id", "CreatedAt", "CreatedBy", "Email", "is_active", "IsDeleted", "legal_entity", "MarketEntryDate", "MarketExitDate", "name", "PortfolioSize", "RowVersion", "short_code", "UpdatedAt", "UpdatedBy" },
-                values: new object[,]
-                {
-                    { new Guid("a0000001-0000-0000-0000-000000000001"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Alpha Gas Limited", null, null, "Alpha Gas Ltd", null, null, "SHIP_A", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000002"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Beta Energy PLC", null, null, "Beta Energy plc", null, null, "SHIP_B", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000003"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Gamma Supply Limited", null, null, "Gamma Supply Ltd", null, null, "SHIP_C", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000004"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Delta Gas Company", null, null, "Delta Gas Co", null, null, "SHIP_D", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000005"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Epsilon Energy Ltd", null, null, "Epsilon Energy", null, null, "SHIP_E", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000006"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Zeta Gas Limited", null, null, "Zeta Gas Ltd", null, null, "SHIP_F", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000007"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Eta Supply PLC", null, null, "Eta Supply plc", null, null, "SHIP_G", null, null },
-                    { new Guid("a0000001-0000-0000-0000-000000000008"), new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Utc), "SEED", null, true, false, "Theta Gas Corporation", null, null, "Theta Gas Corp", null, null, "SHIP_H", null, null }
-                });
-
             migrationBuilder.CreateIndex(
                 name: "ix_file_hash",
                 table: "ingestion_files",
@@ -430,40 +462,19 @@ namespace PAFA.Infrastructure.Migrations
                 column: "Status");
 
             migrationBuilder.CreateIndex(
+                name: "IX_metric_values_IngestionFileId",
+                table: "metric_values",
+                column: "IngestionFileId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_metric_values_Period_Shipper_MetricKey",
+                table: "metric_values",
+                columns: new[] { "ReportingPeriod", "ShipperShortCode", "MetricKey" });
+
+            migrationBuilder.CreateIndex(
                 name: "IX_metric_values_ShipperId",
                 table: "metric_values",
                 column: "ShipperId");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_mv_metric_key",
-                table: "metric_values",
-                column: "MetricKey");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_mv_period",
-                table: "metric_values",
-                column: "ReportingPeriod");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_mv_period_key",
-                table: "metric_values",
-                columns: new[] { "ReportingPeriod", "MetricKey" });
-
-            migrationBuilder.CreateIndex(
-                name: "ix_mv_product_class",
-                table: "metric_values",
-                column: "product_class_code");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_mv_ssc",
-                table: "metric_values",
-                column: "ShipperShortCode");
-
-            migrationBuilder.CreateIndex(
-                name: "ix_mv_unique",
-                table: "metric_values",
-                columns: new[] { "IngestionFileId", "ShipperShortCode", "ReportingPeriod", "MetricKey" },
-                unique: true);
 
             migrationBuilder.CreateIndex(
                 name: "IX_pafa_roles_Name",
@@ -507,20 +518,29 @@ namespace PAFA.Infrastructure.Migrations
                 unique: true);
 
             migrationBuilder.CreateIndex(
-                name: "ix_report_status",
+                name: "IX_reports_IngestionJobId",
                 table: "reports",
-                column: "Status");
+                column: "IngestionJobId");
 
             migrationBuilder.CreateIndex(
-                name: "ix_report_unique",
+                name: "IX_reports_Period_Type",
                 table: "reports",
-                columns: new[] { "ReportTypeId", "ReportingPeriod", "ScheduleNumber" },
-                unique: true);
+                columns: new[] { "ReportingPeriod", "ReportTypeId" });
+
+            migrationBuilder.CreateIndex(
+                name: "IX_reports_ReportTypeId",
+                table: "reports",
+                column: "ReportTypeId");
 
             migrationBuilder.CreateIndex(
                 name: "IX_shipper_product_classes_ProductClassId",
                 table: "shipper_product_classes",
                 column: "ProductClassId");
+
+            migrationBuilder.CreateIndex(
+                name: "IX_shipperAliases_ShipperId_IsActive",
+                table: "shipperAlias",
+                columns: new[] { "ShipperId", "IsActive" });
 
             migrationBuilder.CreateIndex(
                 name: "ix_shipper_short_code",
@@ -532,45 +552,11 @@ namespace PAFA.Infrastructure.Migrations
                 name: "ix_valerr_file",
                 table: "validation_errors",
                 column: "IngestionFileId");
-
-            migrationBuilder.Sql(@"
-            CREATE OR REPLACE VIEW fact_read_performance AS
-            SELECT
-                TO_CHAR(""ReportingPeriod""::timestamptz, 'YYYY-MM') AS report_month,
-                ""ShipperShortCode""                                   AS shipper_code,
-                product_class_code                                     AS product_class,
-                MAX(CASE WHEN ""MetricKey"" = 'read_performance_pct'
-                         THEN ""Value"" END)                           AS read_perf_pct,
-                MAX(CASE WHEN ""MetricKey"" = 'estimated_read_pct'
-                         THEN ""Value"" END)                           AS estimated_pct,
-                MAX(CASE WHEN ""MetricKey"" = 'check_read_count'
-                         THEN ""Value"" END)                           AS check_read_count,
-                MAX(CASE WHEN ""MetricKey"" = 'total_site_count'
-                         THEN ""Value"" END)                           AS total_sites,
-                CAST(
-                    CASE
-                        WHEN product_class_code = 'PC1'
-                             AND MAX(CASE WHEN ""MetricKey"" = 'read_performance_pct'
-                                         THEN ""Value"" END) >= 97.5
-                            THEN 1
-                        WHEN product_class_code = 'PC2'
-                             AND MAX(CASE WHEN ""MetricKey"" = 'read_performance_pct'
-                                         THEN ""Value"" END) >= 80.0
-                            THEN 1
-                        ELSE 0
-                    END
-                AS INTEGER)                                            AS is_compliant
-            FROM metric_values mv
-            WHERE product_class_code IS NOT NULL
-            GROUP BY ""ReportingPeriod"", ""ShipperShortCode"", product_class_code;
-        ");
         }
 
         /// <inheritdoc />
         protected override void Down(MigrationBuilder migrationBuilder)
         {
-            migrationBuilder.Sql("DROP VIEW IF EXISTS fact_read_performance;");
-
             migrationBuilder.DropTable(
                 name: "metric_values");
 
@@ -582,6 +568,9 @@ namespace PAFA.Infrastructure.Migrations
 
             migrationBuilder.DropTable(
                 name: "shipper_product_classes");
+
+            migrationBuilder.DropTable(
+                name: "shipperAlias");
 
             migrationBuilder.DropTable(
                 name: "validation_errors");

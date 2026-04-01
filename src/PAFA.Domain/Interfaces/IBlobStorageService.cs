@@ -11,14 +11,23 @@ public interface IBlobStorageService
     /// </summary>
     Task<string> UploadAsync(
         string fileName,
-        byte[] content,
+        Stream content,
         string container = "landing-zone",
+        int? year = null,
+        int? month = null,
         CancellationToken ct = default);
 
     /// <summary>
-    /// Télécharge un fichier depuis le stockage.
+    /// Télécharge un fichier depuis le stockage sous forme de flux (Stream)
+    /// pour éviter la surcharge mémoire des gros fichiers.
     /// </summary>
-    Task<byte[]> DownloadAsync(string blobPath, CancellationToken ct = default);
+    Task<Stream> DownloadStreamAsync(string blobPath, CancellationToken ct = default);
+
+    /// <summary>
+    /// Déplace un objet d'un chemin source vers un chemin destination (Copy + Delete).
+    /// Retourne le nouveau chemin.
+    /// </summary>
+    Task<string> MoveAsync(string sourceBlobPath, string destinationBlobPath, CancellationToken ct = default);
 
     /// <summary>
     /// Vérifie que le service de stockage est accessible.

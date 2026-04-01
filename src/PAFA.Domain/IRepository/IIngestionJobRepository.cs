@@ -28,6 +28,12 @@ public interface IIngestionJobRepository : IBaseRepository<IngestionJob>
     /// Used during manual reprocess to locate the parent job and compute RetryCount.
     /// </summary>
     Task<IngestionJob?> GetLatestByPeriodAsync(int year, int month, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns true if a Completed job already exists for the period.
+    /// Used by the cron to detect a fully finished run and avoid duplicate processing.
+    /// </summary>
+    Task<bool> IsAlreadyCompletedAsync(int year, int month, CancellationToken ct = default);
 }
 
 /// <summary>

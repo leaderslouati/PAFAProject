@@ -17,7 +17,7 @@ public interface IRemoteFileSource
     /// <summary>
     /// Télécharge un fichier en mémoire.
     /// </summary>
-    Task<byte[]> DownloadFileAsync(
+    Task<Stream> DownloadFileAsync(
         string remotePath,
         CancellationToken ct = default);
 

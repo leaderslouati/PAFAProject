@@ -33,7 +33,9 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     // ── Reporting ────────────────────────────────────────────
     public DbSet<ReportType> ReportTypes => Set<ReportType>();
     public DbSet<Report> Reports => Set<Report>();
-    public DbSet<FactReadPerformance> FactReadPerformances => Set<FactReadPerformance>();
+    public DbSet<FactReadPerformance> FactReadPerformances => Set<FactReadPerformance>();       
+
+
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

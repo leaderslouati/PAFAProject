@@ -1,11 +1,11 @@
 ﻿using PAFA.Domain.Enums;
-using PAFA.Extraction.Reports.Interfaces;
+using PAFA.Domain.Interfaces;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
 
 
-namespace PAFA.Reports.Writers;  
+namespace PAFA.Reports.Writers;
 
 public  class PdfReportWriter : IReportWriter
 {
