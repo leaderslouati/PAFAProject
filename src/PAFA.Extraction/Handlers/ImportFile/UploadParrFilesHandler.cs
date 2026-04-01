@@ -2,11 +2,11 @@
 using Microsoft.Extensions.Logging;
 using PAFA.Domain.Entities;
 using PAFA.Domain.Enums;
+using PAFA.Domain.Interfaces;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Mapping;
 using PAFA.Extraction.Validation;
 using PAFA.Extraction.Validations;
-using PAFA.Infrastructure.Parsing;
 
 namespace PAFA.Extraction.Commands.Import;
 

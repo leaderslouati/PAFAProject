@@ -1,13 +1,6 @@
-﻿namespace PAFA.Extraction.Commands.Export; 
-public record PowerBiCsvRowDto
-{
-   public DateOnly PeriodeDate { get; set; }
-    public string ShipperCode { get; init; } = string.Empty;
-    public int? ProductClass { get; init; }
-    public string? MrfCode { get; init; }
-    public decimal? ReadPerformancePct { get; init; }
-    public decimal? EstimatedReadPct { get; init; }
-    public int? AqOverdueCount { get; init; }
-    public int? TotalSiteCount { get; init; }
-    public bool IsIndustryAverage { get; init; }
-}
+﻿// Kept for backward compatibility — types now live in PAFA.Domain.Contracts
+global using PowerBiCsvRowDto   = PAFA.Domain.Contracts.PowerBiCsvRowDto;
+global using DashboardSummaryDto = PAFA.Domain.Contracts.DashboardSummaryDto;
+
+namespace PAFA.Extraction.Commands.Export;
+// This file is intentionally empty — DTOs moved to PAFA.Domain.Contracts.ReportDtos.

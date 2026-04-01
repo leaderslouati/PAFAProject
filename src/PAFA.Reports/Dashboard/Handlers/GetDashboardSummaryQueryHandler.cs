@@ -1,7 +1,7 @@
 ﻿using MediatR;
+using PAFA.Domain.Contracts;
 using PAFA.Domain.IRepository;
 using PAFA.Domain.Repositories;
-using PAFA.Extraction.Commands.Export;
 using PAFA.Reports.Dashboard.Queries;
 using System;
 using System.Linq;

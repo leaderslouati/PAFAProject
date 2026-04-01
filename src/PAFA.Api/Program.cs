@@ -9,7 +9,6 @@ using PAFA.Domain.IRepository;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
 using PAFA.Extraction.Commands.Users;
-using PAFA.Extraction.Reports.Interfaces;
 using PAFA.Extraction.Validations;
 using PAFA.Infrastructure.Parsing;
 using PAFA.Infrastructure.Persistence;
@@ -19,6 +18,7 @@ using PAFA.Infrastructure.Services;
 using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Ddp;
 using PAFA.Infrastructure.Storage;
+using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Reports.Handlers;
 using PAFA.Reports.Writers;
 using System.Text;
@@ -127,6 +127,18 @@ builder.Services.AddScoped<IPafaUserRepository,      PafaUserRepository>();
 
 // POC: logs the email. Swap for SmtpEmailService / SendGridEmailService in prod.
 builder.Services.AddScoped<IEmailService, LoggingEmailService>();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  POWER BI EMBEDDED — Service Principal (App Owns Data)
+// ═══════════════════════════════════════════════════════════════════════
+
+var pbiSettings = builder.Configuration
+    .GetSection(PowerBiSettings.SectionName)
+    .Get<PowerBiSettings>() ?? new PowerBiSettings();
+
+builder.Services.AddSingleton(pbiSettings);
+builder.Services.AddSingleton<PowerBiClientFactory>();
+builder.Services.AddScoped<IPowerBiExportService, PowerBiExportService>();
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SHAREPOINT — Source de fichiers PARR (Microsoft Graph)

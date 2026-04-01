@@ -1,7 +1,7 @@
 using ClosedXML.Excel;
 using Microsoft.Extensions.Logging;
+using PAFA.Domain.Contracts;
 using PAFA.Domain.IRepository;
-using PAFA.Extraction.Commands.Export;
 using PAFA.Reports.Batch.Models;
 
 namespace PAFA.Reports.Batch.Core;

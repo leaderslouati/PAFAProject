@@ -1,5 +1,6 @@
 ﻿using CsvHelper;
 using CsvHelper.Configuration;
+using PAFA.Domain.Interfaces;
 using System.Globalization;
 
 namespace PAFA.Infrastructure.Parsing;

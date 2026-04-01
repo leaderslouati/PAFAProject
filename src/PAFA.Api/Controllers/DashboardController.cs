@@ -16,7 +16,7 @@ namespace PAFA.Api.Controllers
         /// Si year/month non fournis, calcule sur toutes les données disponibles.
         /// </summary>
         [HttpGet("summary")]
-        [ProducesResponseType(typeof(PAFA.Extraction.Commands.Export.DashboardSummaryDto), StatusCodes.Status200OK)]
+        [ProducesResponseType(typeof(PAFA.Domain.Contracts.DashboardSummaryDto), StatusCodes.Status200OK)]
         public async Task<IActionResult> GetSummary([FromQuery] int? year, [FromQuery] int? month)
         {
             var result = await _mediator.Send(new GetDashboardSummaryQuery(year, month));

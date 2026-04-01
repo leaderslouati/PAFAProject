@@ -1,7 +1,7 @@
 using CsvHelper;
 using CsvHelper.Configuration;
 using PAFA.Domain.Enums;
-using PAFA.Extraction.Reports.Interfaces;
+using PAFA.Domain.Interfaces;
 using System.Globalization;
 
 namespace PAFA.Reports.Writers;

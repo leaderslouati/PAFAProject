@@ -1,8 +1,8 @@
 ﻿using MediatR;
+using PAFA.Domain.Contracts;
 using PAFA.Domain.Enums;
+using PAFA.Domain.Interfaces;
 using PAFA.Domain.IRepository;
-using PAFA.Extraction.Commands.Export;
-using PAFA.Extraction.Reports.Interfaces;
 using PAFA.Reports.Queries;
 
 namespace PAFA.Reports.Handlers;

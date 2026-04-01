@@ -3,7 +3,7 @@
 #
 # Pré-requis :
 #   1. Activer Kubernetes dans Docker Desktop ? Settings ? Kubernetes ? Enable
-#   2. L'infra Docker Compose doit tourner (PostgreSQL, SFTP, MinIO) :
+#   2. L'infra Docker Compose doit tourner (PostgreSQL, MinIO) :
 #        docker network create pafa_network
 #        docker compose up -d
 #
@@ -21,15 +21,14 @@
 #   # 4. Nettoyer après test
 #   kubectl delete -f src/PAFA.BatchReports/cronjob-local.yaml
 #
-# ??? ASTUCE : changer le schedule pour tester immédiatement ???????????????????
+# ? ASTUCE : changer le schedule pour tester immédiatement ?
 #   Exemple : il est 15:35, vous voulez que ça se lance à 15:37
 #     schedule: "37 15 * * *"
 #
 #   Format cron : MINUTE HEURE JOUR_MOIS MOIS JOUR_SEMAINE
 #     "*/2 * * * *"    ? toutes les 2 minutes (stress test)
 #     "37 15 * * *"    ? tous les jours à 15:37
-#     "0 2 1 * *"      ? le 1er du mois à 02:00 (production)
-#     "37 15 21 3 *"   ? le 21 mars à 15:37 (date précise)
+#     "0 2 18-21 * *"  ? jours 18-21 du mois à 02:00 UTC (production PAFA)
 # =============================================================================
 
 apiVersion: batch/v1
@@ -37,16 +36,16 @@ kind: CronJob
 metadata:
   name: pafa-ingestion-cronjob
 spec:
-  # ??????????????????????????????????????????????????????????????????
+  # ??????????????????????????????????????????????????????????????
   #  SCHEDULE — Modifier ici pour tester sans attendre
   #
   #  Pour tester MAINTENANT : regardez votre horloge, ajoutez 2 min
   #  Exemple : il est 15:35 ? mettez "37 15 * * *"
   #
-  #  Production : "0 2 1 * *" (1er du mois à 02:00 UTC)
-  # ??????????????????????????????????????????????????????????????????
-  schedule: "*/2 * * * *"   # ? TOUTES LES 2 MIN (pour test local)
-  # schedule: "0 2 1 * *"   # ? PRODUCTION (1er du mois à 02:00 UTC)
+  #  Production PAFA : "0 2 18-21 * *" (jours 18-21 du mois à 02:00 UTC)
+  # ??????????????????????????????????????????????????????????????
+  schedule: "*/2 * * * *"     # ? TOUTES LES 2 MIN (pour test local)
+  # schedule: "0 2 18-21 * *" # ? PRODUCTION (jours 18-21 à 02:00 UTC)
 
   concurrencyPolicy: Forbid
   successfulJobsHistoryLimit: 3
@@ -68,7 +67,7 @@ spec:
             image: pafa-batch:local
             imagePullPolicy: Never
 
-            # Ingestion uniquement (SFTP ? MinIO ? Parse ? Validate ? Insert)
+            # Ingestion uniquement (SharePoint ? MinIO ? Parse ? Validate ? Insert)
             args: ["--ingest"]
 
             resources:
@@ -88,21 +87,15 @@ spec:
             - name: PAFA_ConnectionStrings__DefaultConnection
               value: "Host=host.docker.internal;Port=5432;Database=pafadb;Username=postgres;Password=postgres"
 
-            # SFTP — pointe vers le container SFTP local (port mappé 2222)
-            - name: PAFA_Sftp__Host
-              value: "host.docker.internal"
-            - name: PAFA_Sftp__Port
-              value: "2222"
-            - name: PAFA_Sftp__Username
-              value: "xoserve"
-            - name: PAFA_Sftp__Password
-              value: "xoserve_pass"
-            - name: PAFA_Sftp__RemotePath
-              value: "/upload"
-            - name: PAFA_Sftp__ProcessedPath
-              value: "/processed"
-            - name: PAFA_Sftp__FailedPath
-              value: "/failed"
+            # SharePoint Online — Microsoft Graph API
+            - name: PAFA_SharePoint__TenantId
+              value: "${SP_TENANT_ID}"
+            - name: PAFA_SharePoint__ClientId
+              value: "${SP_CLIENT_ID}"
+            - name: PAFA_SharePoint__ClientSecret
+              value: "${SP_CLIENT_SECRET}"
+            - name: PAFA_SharePoint__SiteId
+              value: "${SP_SITE_ID}"
 
             # Blob Storage — MinIO local (port mappé 9000)
             - name: PAFA_BlobStorage__Provider
@@ -115,3 +108,4 @@ spec:
               value: "minioadmin"
             - name: PAFA_BlobStorage__UseSsl
               value: "false"
+
