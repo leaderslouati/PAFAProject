@@ -3,8 +3,8 @@ using Microsoft.Extensions.Logging;
 using PAFA.Domain.Entities.Authentication;
 using PAFA.Domain.Interfaces;
 using PAFA.Domain.IRepository;
-using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Users;
+using PAFA.Infrastructure.Persistence;
 using System.Security.Cryptography;
 using System.Text;
 

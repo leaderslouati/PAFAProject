@@ -7,7 +7,7 @@ using PAFA.Domain.Repositories;
 using PAFA.Extraction.Mapping;
 using PAFA.Extraction.Validation;
 using PAFA.Extraction.Validations;
-
+using PAFA.Infrastructure.Parsing;
 namespace PAFA.Extraction.Commands.Import;
 
 public class UploadParrFilesCommandHandler
