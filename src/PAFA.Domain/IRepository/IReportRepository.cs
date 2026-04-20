@@ -8,5 +8,13 @@ namespace PAFA.Domain.IRepository;
 /// </summary>
 public interface IReportRepository : IBaseRepository<Report>
 {
-    // Domain-specific methods will be added in Phase 2
+    /// <summary>
+    /// Returns all reports for a given period, ordered by ScheduleNumber.
+    /// </summary>
+    Task<IReadOnlyList<Report>> GetByPeriodAsync(DateOnly reportingPeriod, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns a single report by ID (non-deleted).
+    /// </summary>
+    Task<Report?> GetByIdAsync(Guid id, CancellationToken ct = default);
 }

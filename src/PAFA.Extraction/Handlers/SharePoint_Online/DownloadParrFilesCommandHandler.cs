@@ -6,6 +6,7 @@ using PAFA.Domain.IRepository;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
 using PAFA.Extraction.Validations;
+using PAFA.Extraction.Helpers; 
 
 namespace PAFA.Extraction.Commands.SharePoint;
 
@@ -19,6 +20,7 @@ public sealed class DownloadParrFilesCommandHandler
     private readonly IFileSourceSettings _settings;
     private readonly IIngestionJobRepository _jobRepo;
     private readonly ILogger<DownloadParrFilesCommandHandler> _log;
+    private readonly ISharePointFileHelper _helper; 
 
     public DownloadParrFilesCommandHandler(
         IRemoteFileSource fileSource,
@@ -27,24 +29,61 @@ public sealed class DownloadParrFilesCommandHandler
         IUnitOfWork uow,
         IFileSourceSettings settings,
         IIngestionJobRepository jobRepo,
-        ILogger<DownloadParrFilesCommandHandler> log)
+        ILogger<DownloadParrFilesCommandHandler> log,
+        ISharePointFileHelper helper)
     {
         _fileSource = fileSource;
-        _blob       = blob;
-        _mediator   = mediator;
-        _uow        = uow;
-        _settings   = settings;
-        _jobRepo    = jobRepo;
-        _log        = log;
+        _blob = blob;
+        _mediator = mediator;
+        _uow = uow;
+        _settings = settings;
+        _jobRepo = jobRepo;
+        _log = log;
+        _helper = helper;
     }
+
+    // ── Fenêtre cron : jours 18–21 du mois ───────────────────────────────
+    private static bool IsWithinCronWindow(DateTime utcNow)
+        => utcNow.Day is >= 18 and <= 21;
 
     public async Task<DownloadParrFilesResult> Handle(
         DownloadParrFilesCommand cmd, CancellationToken ct)
     {
-        var now         = DateTime.UtcNow;
-        var periodYear  = cmd.Year  ?? now.Year;
+        var now = DateTime.UtcNow;
+        var periodYear = cmd.Year ?? now.Year;
         var periodMonth = cmd.Month ?? now.Month;
-        var inboundPath = BuildInboundPath(periodYear, periodMonth);
+
+        // ── Vérification fenêtre (uniquement pour les déclenchements automatiques) ──
+        if (cmd.TriggerMode == TriggerMode.Automatic && !IsWithinCronWindow(now))
+        {
+            _log.LogWarning(
+                "[CRON] Déclenchement automatique hors fenêtre (jour {Day}). Abandon. Period: {Year}-{Month:D2}",
+                now.Day, periodYear, periodMonth);
+            return new DownloadParrFilesResult(false, 0, 0, 0, [], [], [],
+                cmd.TriggerSource, cmd.TriggerMode.ToString());
+        }
+
+        // ── Reprise intelligente : vérifier si le job est déjà completé ──
+        if (await _jobRepo.IsAlreadyCompletedAsync(periodYear, periodMonth, ct))
+        {
+            _log.LogInformation(
+                "[CRON] Job déjà complété pour {Year}-{Month:D2}. Aucun traitement nécessaire.",
+                periodYear, periodMonth);
+            return new DownloadParrFilesResult(true, 0, 0, 0, [], [], [],
+                cmd.TriggerSource, cmd.TriggerMode.ToString());
+        }
+
+        // ── Reprise intelligente : charger les fichiers déjà traités ─────
+        var alreadyLoadedFiles = await _uow.IngestionFiles
+            .GetAlreadyLoadedFileNamesAsync(periodYear, periodMonth, ct);
+
+        if (alreadyLoadedFiles.Count > 0)
+            _log.LogInformation(
+                "[CRON] Reprise — {Count} fichier(s) déjà chargé(s) seront ignorés : {Files}",
+                alreadyLoadedFiles.Count, string.Join(", ", alreadyLoadedFiles));
+
+        // ── Utilisation du Helper pour le chemin ──────────────────────────
+        var inboundPath = _helper.BuildInboundPath(periodYear, periodMonth);
 
         // ── Log trigger context ───────────────────────────────────────────
         _log.LogInformation(
@@ -61,7 +100,7 @@ public sealed class DownloadParrFilesCommandHandler
             && !FolderPathValidator.HasValidYearMonthStructure(inboundPath))
         {
             _log.LogError("[FOLD-002] Inbound path '{Path}' does not conform to Year/Month structure.", inboundPath);
-            return Fail("FOLD-002", $"Inbound path '{inboundPath}' is not a valid Year/Month folder.",
+            return _helper.CreateFailResult("FOLD-002", $"Inbound path '{inboundPath}' is not a valid Year/Month folder.",
                 cmd.TriggerSource, cmd.TriggerMode.ToString(), now);
         }
 
@@ -69,8 +108,8 @@ public sealed class DownloadParrFilesCommandHandler
         _log.LogInformation("Période : {Year}-{Month:D2} → dossier source : {Path}", periodYear, periodMonth, inboundPath);
 
         var imported = new List<string>();
-        var errors   = new List<FileError>();
-        var skipped  = new List<SkippedFileRecord>();
+        var errors = new List<FileError>();
+        var skipped = new List<SkippedFileRecord>();
 
         // ── 1. Test connexion ─────────────────────────────────────────────
         if (!await _fileSource.TestConnectionAsync(ct))
@@ -101,15 +140,24 @@ public sealed class DownloadParrFilesCommandHandler
         {
             if (ct.IsCancellationRequested) break;
 
+            // ── Reprise : ignorer les fichiers déjà chargés ───────────────
+            if (alreadyLoadedFiles.Contains(file.FileName))
+            {
+                _log.LogInformation("[CRON] Skip (déjà chargé) : {File}", file.FileName);
+                imported.Add(file.FileName);
+                continue;
+            }
+
             // FOLD-001
             if (_settings.EnforceYearMonthFolderStructure
                 && !FolderPathValidator.IsValidYearMonthPath(file.FullRemotePath, periodYear, periodMonth))
             {
-                LogFileSkipped(file.FileName, "FOLD-001",
+                _helper.LogFileSkipped(file.FileName, "FOLD-001",
                     $"File path '{file.FullRemotePath}' is outside expected folder '{inboundPath}'.");
                 skipped.Add(new SkippedFileRecord(file.FileName, "FOLD-001",
                     $"File is outside the expected folder '{inboundPath}'.", now));
-                await SafeMoveFailed(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
+
+                await _helper.SafeMoveFailedAsync(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
                 continue;
             }
 
@@ -121,10 +169,10 @@ public sealed class DownloadParrFilesCommandHandler
             {
                 foreach (var finding in nameValidation.Findings.Where(f => f.Severity == "ERROR"))
                 {
-                    LogFileSkipped(file.FileName, finding.RuleId, finding.Message);
+                    _helper.LogFileSkipped(file.FileName, finding.RuleId, finding.Message);
                     skipped.Add(new SkippedFileRecord(file.FileName, finding.RuleId, finding.Message, now));
                 }
-                await SafeMoveFailed(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
+                await _helper.SafeMoveFailedAsync(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
                 continue;
             }
 
@@ -135,23 +183,28 @@ public sealed class DownloadParrFilesCommandHandler
 
             try
             {
-                var bytes = await _fileSource.DownloadFileAsync(file.FullRemotePath, ct);
-                _log.LogInformation("Téléchargé {Size:N0} bytes", bytes.Length);
+                string blobPath;
 
-                var blobPath = await _blob.UploadAsync(file.FileName, bytes, "landing-zone", ct);
+                // ── Transfert vers le Blob via Stream (Optimisation RAM) ──
+                using (var fileStream = await _fileSource.DownloadFileAsync(file.FullRemotePath, ct))
+                {
+                    _log.LogInformation("Téléchargement et transfert en cours vers le Blob Storage...");
+                    blobPath = await _blob.UploadAsync(file.FileName, fileStream, "landing-zone", periodYear, periodMonth, ct);
+                }
+
                 _log.LogInformation("📦 Sauvegardé en blob : {BlobPath}", blobPath);
 
                 // Map TriggerMode → JobTrigger for the IngestionJob entity
                 var jobTrigger = cmd.TriggerSource switch
                 {
-                    "CRON_AUTO"        => JobTrigger.Scheduler,
+                    "CRON_AUTO" => JobTrigger.Scheduler,
                     "MANUAL_REPROCESS" => JobTrigger.Retry,
-                    _                  => JobTrigger.Api
+                    _ => JobTrigger.Api
                 };
 
                 // ── Reprocess: link to parent job ─────────────────────────
                 Guid? parentJobId = null;
-                int   retryCount  = 0;
+                int retryCount = 0;
 
                 if (cmd.TriggerSource == "MANUAL_REPROCESS")
                 {
@@ -159,33 +212,33 @@ public sealed class DownloadParrFilesCommandHandler
                     if (previousJob is not null)
                     {
                         parentJobId = previousJob.Id;
-                        retryCount  = previousJob.RetryCount + 1;
+                        retryCount = previousJob.RetryCount + 1;
                         _log.LogInformation(
                             "AUDIT | Reprocess | ParentJobId={Parent} | RetryCount={Retry} | Period={Year}-{Month:D2}",
                             parentJobId, retryCount, periodYear, periodMonth);
                     }
                 }
 
+                // ── Envoi de la commande de traitement ────────────────────
                 var importResult = await _mediator.Send(new UploadParrFilesCommand(
-                    FileName:     file.FileName,
-                    FileContent:  bytes,
-                    PeriodYear:   periodYear,
-                    PeriodMonth:  periodMonth,
-                    UploadedBy:   cmd.TriggerSource,
-                    SourceSystem: DetectSourceSystem(file.FileName),
-                    BlobPath:     blobPath,
+                    FileName: file.FileName,
+                    // Note : FileContent (byte[]) a été supprimé de la commande
+                    PeriodYear: periodYear,
+                    PeriodMonth: periodMonth,
+                    BlobPath: blobPath,
                     TriggerSource: cmd.TriggerSource,
-                    ParentJobId:  parentJobId,
-                    RetryCount:   retryCount,
-                    JobTrigger:   jobTrigger), ct);
+                    ParentJobId: parentJobId,
+                    RetryCount: retryCount,
+                    JobTrigger: jobTrigger), ct);
 
                 if (importResult.Success)
                 {
                     _log.LogInformation("✅ {File} — {Valid} lignes valides, {Read} lues",
                         file.FileName, importResult.RowsValid, importResult.RowsRead);
 
-                    var processedPath = BuildProcessedPath(periodYear, periodMonth, file.FileName);
+                    var processedPath = _helper.BuildProcessedPath(periodYear, periodMonth, file.FileName);
                     await _fileSource.MoveFileAsync(file.FullRemotePath, processedPath, ct);
+
                     _log.LogInformation("📁 Archivé : {Path}", processedPath);
                     imported.Add(file.FileName);
                 }
@@ -193,14 +246,14 @@ public sealed class DownloadParrFilesCommandHandler
                 {
                     _log.LogWarning("❌ {File} — {Error}", file.FileName, importResult.ErrorMessage);
                     errors.Add(new FileError(file.FileName, importResult.ErrorMessage ?? "Import failed"));
-                    await SafeMoveFailed(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
+                    await _helper.SafeMoveFailedAsync(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
                 }
             }
             catch (Exception ex)
             {
                 _log.LogError(ex, "Erreur lors du traitement de {File}", file.FileName);
                 errors.Add(new FileError(file.FileName, ex.Message));
-                await SafeMoveFailed(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
+                await _helper.SafeMoveFailedAsync(file.FullRemotePath, file.FileName, periodYear, periodMonth, ct);
             }
         }
 
@@ -209,58 +262,14 @@ public sealed class DownloadParrFilesCommandHandler
             imported.Count, errors.Count, skipped.Count);
 
         return new DownloadParrFilesResult(
-            Success:         imported.Any() || (!errors.Any() && !skipped.Any()),
+            Success: imported.Any() || (!errors.Any() && !skipped.Any()),
             FilesDownloaded: files.Count,
-            FilesImported:   imported.Count,
-            FilesFailed:     errors.Count,
-            ImportedFiles:   imported,
-            Errors:          errors,
-            SkippedFiles:    skipped,
-            TriggerSource:   cmd.TriggerSource,
-            TriggerMode:     cmd.TriggerMode.ToString());
-    }
-
-    // ── Helpers ───────────────────────────────────────────────────────────
-
-    private static DownloadParrFilesResult Fail(string ruleId, string reason,
-        string triggerSource, string triggerMode, DateTime now)
-        => new(false, 0, 0, 0, [], [],
-            [new SkippedFileRecord("*", ruleId, reason, now)],
-            triggerSource, triggerMode);
-
-    private string BuildInboundPath(int year, int month)
-        => $"{_settings.BaseInboundPath.TrimEnd('/')}/{year}/{month:D2}";
-
-    private string BuildProcessedPath(int year, int month, string fileName)
-        => $"{_settings.ProcessedPath.TrimEnd('/')}/{year}/{month:D2}/{fileName}";
-
-    private string BuildFailedPath(int year, int month, string fileName)
-        => $"{_settings.FailedPath.TrimEnd('/')}/{year}/{month:D2}/{fileName}";
-
-    private void LogFileSkipped(string fileName, string ruleId, string reason) =>
-        _log.LogWarning("[{RuleId}] File skipped — {FileName} | Reason: {Reason}", ruleId, fileName, reason);
-
-    private async Task SafeMoveFailed(
-        string remotePath, string fileName, int year, int month, CancellationToken ct)
-    {
-        try
-        {
-            await _fileSource.MoveFileAsync(remotePath, BuildFailedPath(year, month, fileName), ct);
-            _log.LogInformation("📁 Archivé dans Failed : {Path}", BuildFailedPath(year, month, fileName));
-        }
-        catch (Exception ex)
-        {
-            _log.LogError(ex, "Impossible de déplacer {File} vers /Failed", fileName);
-        }
-    }
-
-    private static string DetectSourceSystem(string fileName)
-    {
-        var u = fileName.ToUpperInvariant();
-        if (u.Contains("MOD520A") || u.Contains("RPT_1364") || u.Contains("MOD700") || u.Contains("EUC09"))
-            return "CDSP";
-        if (u.Contains("TRANSFER") || u.Contains("CLASS4AQ"))
-            return "DDP";
-        return "CDSP";
+            FilesImported: imported.Count,
+            FilesFailed: errors.Count,
+            ImportedFiles: imported,
+            Errors: errors,
+            SkippedFiles: skipped,
+            TriggerSource: cmd.TriggerSource,
+            TriggerMode: cmd.TriggerMode.ToString());
     }
 }

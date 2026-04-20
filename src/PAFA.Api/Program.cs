@@ -9,14 +9,16 @@ using PAFA.Domain.IRepository;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
 using PAFA.Extraction.Commands.Users;
+using PAFA.Extraction.Helpers;
+using PAFA.Extraction.Services;
 using PAFA.Extraction.Validations;
 using PAFA.Infrastructure.Parsing;
 using PAFA.Infrastructure.Persistence;
 using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
 using PAFA.Infrastructure.Services;
+using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Infrastructure.SharePoint;
-using PAFA.Infrastructure.Ddp;
 using PAFA.Infrastructure.Storage;
 using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Reports.Handlers;
@@ -125,8 +127,40 @@ builder.Services.AddScoped<IPafaUserRepository,      PafaUserRepository>();
 //  SERVICES
 // ═══════════════════════════════════════════════════════════════════════
 
+// Scoped in-memory cache shared across Parse → Validate → Persist handlers
+// within the same HTTP request.
+builder.Services.AddScoped<PAFA.Extraction.Services.FilePipelineCache>();
+
+// ── Ingestion pipeline queue + background worker ────────────────────────────
+// La queue est Singleton : partagée entre le contrôleur HTTP (producteur)
+// et le worker background (consommateur).
+builder.Services.AddSingleton<IIngestionPipelineQueue, IngestionPipelineQueue>();
+builder.Services.AddHostedService<PAFA.Api.BackgroundServices.IngestionPipelineWorker>();
+
 // POC: logs the email. Swap for SmtpEmailService / SendGridEmailService in prod.
 builder.Services.AddScoped<IEmailService, LoggingEmailService>();
+builder.Services.AddScoped<ISharePointFileHelper, SharePointFileHelper>();
+// ═══════════════════════════════════════════════════════════════════════
+//  POWER BI EMBEDDED — Service Principal (App Owns Data)
+// ═══════════════════════════════════════════════════════════════════════
+
+var pbiSettings = builder.Configuration
+    .GetSection(PowerBiSettings.SectionName)
+    .Get<PowerBiSettings>() ?? new PowerBiSettings();
+
+builder.Services.AddSingleton(pbiSettings);
+builder.Services.AddSingleton<PowerBiClientFactory>();
+builder.Services.AddScoped<IPowerBiExportService, PowerBiExportService>();
+
+// ── Power BI Batch Export — monthly automated export of 41 reports ──
+
+var pbiBatchSettings = builder.Configuration
+    .GetSection(PowerBiBatchExportSettings.SectionName)
+    .Get<PowerBiBatchExportSettings>() ?? new PowerBiBatchExportSettings();
+
+builder.Services.AddSingleton(pbiBatchSettings);
+builder.Services.AddScoped<PowerBiDatasetRefreshService>();
+builder.Services.AddScoped<IPowerBiBatchExportService, PowerBiBatchExportService>();
 
 // ═══════════════════════════════════════════════════════════════════════
 //  POWER BI EMBEDDED — Service Principal (App Owns Data)
@@ -150,13 +184,6 @@ builder.Services.AddScoped<IRemoteFileSource, SharePointFileSource>();
 builder.Services.AddScoped<IFileSourceSettings>(sp =>
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<SharePointSettings>>().Value);
 
-// ═══════════════════════════════════════════════════════════════════════════════
-//  DDP (secondary) — optional HTTP validation for manual uploads
-// ═══════════════════════════════════════════════════════════════════════════════
-builder.Services.Configure<DdpSettings>(
-    builder.Configuration.GetSection(DdpSettings.SectionName));
-builder.Services.AddHttpClient("ddp-client");
-builder.Services.AddScoped<IDdpCredentialValidator, DdpCredentialValidator>();
 
 // ═══════════════════════════════════════════════════════════════════════
 //  BLOB STORAGE
@@ -237,6 +264,23 @@ builder.Services.AddCors(options =>
 builder.Services.Configure<IngestionScheduleSettings>(
     builder.Configuration.GetSection(IngestionScheduleSettings.SectionName));
 builder.Services.AddSingleton<IIngestionScheduleService, IngestionScheduleService>();
+
+// ═══════════════════════════════════════════════════════════════════════
+//  BACKGROUND SERVICES
+// ═══════════════════════════════════════════════════════════════════════
+
+// The MonthlyReportExportWorker is registered only when the PowerBiBatchExport
+// feature is enabled. In production we expect Kubernetes CronJobs to run the
+// batch exports; set PowerBiBatchExport:IsEnabled = true to enable the
+// hosted worker (not recommended in prod to avoid duplicate runs).
+if (pbiBatchSettings.IsEnabled)
+{
+    builder.Services.AddHostedService<PAFA.Api.BackgroundServices.MonthlyReportExportWorker>();
+}
+else
+{
+    // Hosted service is disabled; external schedulers (K8s CronJobs) should handle exports.
+}
 
 // ═══════════════════════════════════════════════════════════════════════
 //  BUILD APPLICATION

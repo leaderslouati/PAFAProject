@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Mvc;
 using PAFA.Domain.IRepository;
 using PAFA.Extraction.Commands.Validation;
 
-namespace PAFA.Api.Controllers;
+namespace PAFA.Api.Controllers.ImportFile;
 
 [ApiController]
 [Route("api/validation")]

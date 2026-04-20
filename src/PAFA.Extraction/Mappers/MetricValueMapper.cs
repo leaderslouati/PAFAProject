@@ -1,4 +1,5 @@
-﻿using PAFA.Domain.Interfaces;
+﻿using PAFA.Domain.Entities;
+using PAFA.Domain.Interfaces;
 
 namespace PAFA.Extraction.Mapping;
 

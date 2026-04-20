@@ -15,6 +15,7 @@ using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
 using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Storage;
+using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Reports.Batch.Configuration;
 using PAFA.Reports.Batch.Core;
 
@@ -27,6 +28,7 @@ namespace PAFA.BatchReports;
 //   --ingest                     : Traite tous les fichiers dans SharePoint /{year}/{month:D2}/
 //   --ingest --year N --month N  : Force la période (ex: --year 2025 --month 7)
 //   --reports                    : Génère les rapports PDF/Excel depuis la DB
+//   --powerbi-export             : Export mensuel des 41 rapports Power BI (PDF → Blob → DB)
 //   (aucun argument)             : Pipeline complet — ingest + reports
 /// </summary>
 class Program
@@ -60,9 +62,10 @@ class Program
 
             return mode switch
             {
-                BatchMode.Ingest  => await RunIngestionAsync(scope, logger, year, month),
-                BatchMode.Reports => await RunReportsAsync(scope, logger),
-                _                 => await RunFullPipelineAsync(scope, logger, year, month)
+                BatchMode.Ingest       => await RunIngestionAsync(scope, logger, year, month),
+                BatchMode.Reports      => await RunReportsAsync(scope, logger),
+                BatchMode.PowerBiExport => await RunPowerBiExportAsync(scope, logger),
+                _                      => await RunFullPipelineAsync(scope, logger, year, month)
             };
         }
         catch (Exception ex)
@@ -93,19 +96,40 @@ class Program
         var targetYear  = year  ?? now.Year;
         var targetMonth = month ?? now.Month;
 
+        // ── Vérification fenêtre 18-21 (sécurité code, en complément du schedule K8s) ──
+        if (now.Day is < 18 or > 21 && year is null && month is null)
+        {
+            logger.LogWarning(
+                "[CRON] Déclenchement hors fenêtre (jour {Day}). Le cron ne doit s'exécuter que les jours 18-21.",
+                now.Day);
+            return 0; // Sortie propre, pas une erreur
+        }
+
         logger.LogInformation(
             "═══ SharePoint Ingestion — dossier source : /{Year}/{Month:D2}/ ═══",
             targetYear, targetMonth);
         try
         {
             var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
-            var result = await mediator.Send(new DownloadParrFilesCommand(year, month));
+            var result = await mediator.Send(new DownloadParrFilesCommand(
+                year, month,
+                TriggerSource: "CRON_AUTO",
+                TriggerMode:   PAFA.Domain.Enums.TriggerMode.Automatic));
 
             logger.LogInformation(
                 "Ingestion terminée — {Downloaded} téléchargés, {Imported} importés, {Failed} en erreur",
                 result.FilesDownloaded, result.FilesImported, result.FilesFailed);
 
-            return result.FilesFailed > 0 && result.FilesImported == 0 ? 1 : 0;
+            // ── Fail-Fast : si un fichier a échoué, retourner code erreur ──
+            if (result.FilesFailed > 0)
+            {
+                logger.LogError(
+                    "[CRON] Fail-Fast — {Failed} fichier(s) en erreur. Le cron sera relancé automatiquement.",
+                    result.FilesFailed);
+                return 1;
+            }
+
+            return 0;
         }
         catch (Exception ex)
         {
@@ -130,6 +154,41 @@ class Program
         {
             logger.LogError(ex, "Report generation failed");
             return 1;
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  POWER BI EXPORT — Monthly batch export of 41 reports
+    //  Flow: Refresh datasets → Export PDF → Upload Blob → Track DB
+    // ════════════════════════════════════════════════════════════════
+
+    static async Task<int> RunPowerBiExportAsync(IServiceScope scope, ILogger logger)
+    {
+        // Reporting period = previous month (run on 1st → exports prior month)
+        var now = DateTime.UtcNow;
+        var reportingPeriod = new DateOnly(now.Year, now.Month, 1).AddMonths(-1);
+
+        logger.LogInformation(
+            "═══ Power BI Batch Export — period {Period:yyyy-MM} ═══", reportingPeriod);
+
+        try
+        {
+            var batchService = scope.ServiceProvider
+                .GetRequiredService<IPowerBiBatchExportService>();
+
+            var result = await batchService.ExecuteMonthlyExportAsync(reportingPeriod);
+
+            logger.LogInformation(
+                "Power BI export completed: {Succeeded}/{Total} reports, {Failed} failed, {Duration:F0}s",
+                result.Succeeded, result.TotalReports, result.Failed,
+                result.TotalDuration.TotalSeconds);
+
+            return result.Failed > 0 ? 1 : 0;
+        }
+        catch (Exception ex)
+        {
+            logger.LogCritical(ex, "Power BI batch export failed");
+            return 2;
         }
     }
 
@@ -161,8 +220,9 @@ class Program
 
     static BatchMode ResolveMode(string[] args)
     {
-        if (args.Contains("--ingest"))  return BatchMode.Ingest;
-        if (args.Contains("--reports")) return BatchMode.Reports;
+        if (args.Contains("--ingest"))         return BatchMode.Ingest;
+        if (args.Contains("--reports"))         return BatchMode.Reports;
+        if (args.Contains("--powerbi-export"))  return BatchMode.PowerBiExport;
         return BatchMode.Full;
     }
 
@@ -238,6 +298,21 @@ class Program
                 services.AddScoped<ReportGenerator, ExcelReportGenerator>();
                 services.AddScoped<BatchReportOrchestrator>();
 
+                // ── Power BI Batch Export (mode --powerbi-export) ───────
+                var pbiSettings = context.Configuration
+                    .GetSection(PowerBiSettings.SectionName)
+                    .Get<PowerBiSettings>() ?? new PowerBiSettings();
+                services.AddSingleton(pbiSettings);
+                services.AddSingleton<PowerBiClientFactory>();
+
+                var pbiBatchSettings = context.Configuration
+                    .GetSection(PowerBiBatchExportSettings.SectionName)
+                    .Get<PowerBiBatchExportSettings>() ?? new PowerBiBatchExportSettings();
+                services.AddSingleton(pbiBatchSettings);
+
+                services.AddScoped<PowerBiDatasetRefreshService>();
+                services.AddScoped<IPowerBiBatchExportService, PowerBiBatchExportService>();
+
                 services.AddLogging(logging =>
                 {
                     logging.ClearProviders();
@@ -246,4 +321,4 @@ class Program
             });
 }
 
-enum BatchMode { Full, Ingest, Reports }
+enum BatchMode { Full, Ingest, Reports, PowerBiExport }

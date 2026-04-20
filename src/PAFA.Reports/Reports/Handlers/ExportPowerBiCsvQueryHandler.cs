@@ -1,5 +1,6 @@
 ﻿using MediatR;
 using PAFA.Domain.Contracts;
+using PAFA.Domain.Entities;
 using PAFA.Domain.Enums;
 using PAFA.Domain.Interfaces;
 using PAFA.Domain.IRepository;

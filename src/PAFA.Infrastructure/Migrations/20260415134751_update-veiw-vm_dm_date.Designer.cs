@@ -12,8 +12,8 @@ using PAFA.Infrastructure.Persistence;
 namespace PAFA.Infrastructure.Migrations
 {
     [DbContext(typeof(PafaDbContext))]
-    [Migration("20260327130956_Add-Shipper-Alias-Entities")]
-    partial class AddShipperAliasEntities
+    [Migration("20260415134751_update-veiw-vm_dm_date")]
+    partial class updateveiwvm_dm_date
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -24,88 +24,6 @@ namespace PAFA.Infrastructure.Migrations
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
-
-            modelBuilder.Entity("MetricValue", b =>
-                {
-                    b.Property<Guid>("Id")
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
-
-                    b.Property<DateTime>("CreatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("CreatedBy")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<Guid>("IngestionFileId")
-                        .HasColumnType("uuid");
-
-                    b.Property<bool>("IsDeleted")
-                        .HasColumnType("boolean");
-
-                    b.Property<string>("MetricKey")
-                        .IsRequired()
-                        .HasMaxLength(60)
-                        .HasColumnType("character varying(60)");
-
-                    b.Property<string>("ProductClassCode")
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)")
-                        .HasColumnName("product_class_code");
-
-                    b.Property<DateOnly>("ReportingPeriod")
-                        .HasColumnType("date");
-
-                    b.Property<byte[]>("RowVersion")
-                        .HasColumnType("bytea");
-
-                    b.Property<Guid?>("ShipperId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("ShipperShortCode")
-                        .IsRequired()
-                        .HasMaxLength(10)
-                        .HasColumnType("character varying(10)");
-
-                    b.Property<string>("TextValue")
-                        .HasColumnType("text");
-
-                    b.Property<DateTime?>("UpdatedAt")
-                        .HasColumnType("timestamp with time zone");
-
-                    b.Property<string>("UpdatedBy")
-                        .HasColumnType("text");
-
-                    b.Property<decimal>("Value")
-                        .HasColumnType("numeric(12,4)");
-
-                    b.HasKey("Id");
-
-                    b.HasIndex("MetricKey")
-                        .HasDatabaseName("ix_mv_metric_key");
-
-                    b.HasIndex("ProductClassCode")
-                        .HasDatabaseName("ix_mv_product_class");
-
-                    b.HasIndex("ReportingPeriod")
-                        .HasDatabaseName("ix_mv_period");
-
-                    b.HasIndex("ShipperId");
-
-                    b.HasIndex("ShipperShortCode")
-                        .HasDatabaseName("ix_mv_ssc");
-
-                    b.HasIndex("ReportingPeriod", "MetricKey")
-                        .HasDatabaseName("ix_mv_period_key");
-
-                    b.HasIndex("IngestionFileId", "ShipperShortCode", "ReportingPeriod", "MetricKey")
-                        .IsUnique()
-                        .HasDatabaseName("ix_mv_unique");
-
-                    b.ToTable("metric_values", (string)null);
-                });
 
             modelBuilder.Entity("PAFA.Domain.Entities.Authentication.PafaUser", b =>
                 {
@@ -427,6 +345,73 @@ namespace PAFA.Infrastructure.Migrations
                     b.ToTable("ingestion_jobs", (string)null);
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.MetricValue", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("IngestionFileId")
+                        .HasColumnType("uuid");
+
+                    b.Property<bool>("IsDeleted")
+                        .HasColumnType("boolean");
+
+                    b.Property<string>("MetricKey")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("ProductClassCode")
+                        .HasMaxLength(10)
+                        .HasColumnType("character varying(10)");
+
+                    b.Property<DateOnly>("ReportingPeriod")
+                        .HasColumnType("date");
+
+                    b.Property<byte[]>("RowVersion")
+                        .HasColumnType("bytea");
+
+                    b.Property<Guid?>("ShipperId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ShipperShortCode")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)");
+
+                    b.Property<string>("TextValue")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("numeric(18,6)");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IngestionFileId");
+
+                    b.HasIndex("ShipperId")
+                        .HasDatabaseName("IX_metric_values_ShipperId");
+
+                    b.HasIndex("ReportingPeriod", "ShipperShortCode", "MetricKey")
+                        .HasDatabaseName("IX_metric_values_Period_Shipper_MetricKey");
+
+                    b.ToTable("metric_values", (string)null);
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.Referential.ProductClass", b =>
                 {
                     b.Property<int>("Id")
@@ -607,9 +592,8 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<string>("AliasCode")
                         .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("alias_code");
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -617,6 +601,11 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<string>("CreatedBy")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
@@ -633,9 +622,16 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<string>("UpdatedBy")
                         .HasColumnType("text");
 
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("ShipperId");
+                    b.HasIndex("ShipperId", "IsActive")
+                        .HasDatabaseName("IX_shipperAliases_ShipperId_IsActive");
 
                     b.ToTable("shipperAlias", (string)null);
                 });
@@ -651,35 +647,50 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<DateOnly>("ReportingPeriod")
                         .HasColumnType("date");
 
+                    b.Property<int?>("CheckReadCountNotCompleted")
+                        .HasColumnType("integer")
+                        .HasComment("Nb check reads non complétés. >= 0.");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("CreatedBy")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
+
+                    b.Property<decimal?>("EstimatedPct")
+                        .HasColumnType("numeric(8,4)")
+                        .HasComment("% lectures estimées (0-100). Source: MetricKey='EstimatedPct'.");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<int?>("NoMeterCount")
+                        .HasColumnType("integer")
+                        .HasComment("Nb SP sans meter enregistré. >= 0.");
+
+                    b.Property<decimal?>("NoMeterPct")
+                        .HasColumnType("numeric(8,4)")
+                        .HasComment("% SP sans meter. PC1/PC2 = 0.");
+
+                    b.Property<decimal?>("ReadPerfPct")
+                        .HasColumnType("numeric(8,4)")
+                        .HasComment("% global de performance lecture (0-100).");
+
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
-                        .HasColumnType("bytea")
-                        .HasDefaultValueSql("decode('', 'hex')");
+                        .HasColumnType("bytea");
 
                     b.Property<int?>("SupplyPointCount")
                         .HasColumnType("integer");
 
                     b.Property<decimal?>("TotalAQ_MWH")
-                        .HasColumnType("numeric(14,4)");
+                        .HasColumnType("numeric");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("UpdatedBy")
-                        .HasMaxLength(100)
-                        .HasColumnType("character varying(100)");
+                        .HasColumnType("text");
 
                     b.HasKey("ShipperId", "ProductClassId", "ReportingPeriod");
 
@@ -692,21 +703,17 @@ namespace PAFA.Infrastructure.Migrations
                 {
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("uuid")
-                        .HasDefaultValueSql("gen_random_uuid()");
+                        .HasColumnType("uuid");
 
-                    b.Property<string>("Audience")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                    b.Property<int>("Audience")
+                        .HasColumnType("integer");
 
                     b.Property<string>("CommentaryBy")
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
                     b.Property<string>("CommentaryText")
-                        .HasMaxLength(5000)
-                        .HasColumnType("character varying(5000)");
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -731,11 +738,27 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<DateTime?>("GeneratedAt")
                         .HasColumnType("timestamp with time zone");
 
+                    b.Property<Guid?>("IngestionJobId")
+                        .HasColumnType("uuid");
+
                     b.Property<bool>("IsBaseline")
                         .HasColumnType("boolean");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
+
+                    b.Property<string>("ObservationsBy")
+                        .HasMaxLength(256)
+                        .HasColumnType("character varying(256)")
+                        .HasComment("Identifiant (UPN/email) de l'analyste.");
+
+                    b.Property<string>("ObservationsText")
+                        .HasColumnType("text")
+                        .HasComment("Observations mensuelles saisies manuellement par l'analyste PAFA.");
+
+                    b.Property<DateTime?>("ObservationsUpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasComment("Horodatage UTC de la dernière mise à jour des observations.");
 
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");
@@ -747,22 +770,18 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("date");
 
                     b.Property<byte[]>("RowVersion")
-                        .IsConcurrencyToken()
-                        .ValueGeneratedOnAddOrUpdate()
                         .HasColumnType("bytea");
 
                     b.Property<int>("ScheduleNumber")
                         .HasColumnType("integer");
 
-                    b.Property<string>("Status")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)");
+                    b.Property<int>("Status")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(300)
-                        .HasColumnType("character varying(300)");
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
 
                     b.Property<DateTime?>("UpdatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -773,12 +792,12 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("Status")
-                        .HasDatabaseName("ix_report_status");
+                    b.HasIndex("IngestionJobId");
 
-                    b.HasIndex("ReportTypeId", "ReportingPeriod", "ScheduleNumber")
-                        .IsUnique()
-                        .HasDatabaseName("ix_report_unique");
+                    b.HasIndex("ReportTypeId");
+
+                    b.HasIndex("ReportingPeriod", "ReportTypeId")
+                        .HasDatabaseName("IX_reports_Period_Type");
 
                     b.ToTable("reports", (string)null);
                 });
@@ -1004,21 +1023,6 @@ namespace PAFA.Infrastructure.Migrations
                         });
                 });
 
-            modelBuilder.Entity("MetricValue", b =>
-                {
-                    b.HasOne("PAFA.Domain.Entities.IngestionFile", "IngestionFile")
-                        .WithMany("MetricValues")
-                        .HasForeignKey("IngestionFileId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("PAFA.Domain.Entities.Referential.Shipper", null)
-                        .WithMany("MetricValues")
-                        .HasForeignKey("ShipperId");
-
-                    b.Navigation("IngestionFile");
-                });
-
             modelBuilder.Entity("PAFA.Domain.Entities.Authentication.PafaUserRole", b =>
                 {
                     b.HasOne("PafaRole", "Role")
@@ -1059,12 +1063,30 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("ParentJob");
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.MetricValue", b =>
+                {
+                    b.HasOne("PAFA.Domain.Entities.IngestionFile", "IngestionFile")
+                        .WithMany("MetricValues")
+                        .HasForeignKey("IngestionFileId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("PAFA.Domain.Entities.Referential.Shipper", "Shipper")
+                        .WithMany("MetricValues")
+                        .HasForeignKey("ShipperId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("IngestionFile");
+
+                    b.Navigation("Shipper");
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperAlias", b =>
                 {
                     b.HasOne("PAFA.Domain.Entities.Referential.Shipper", "Shipper")
-                        .WithMany()
+                        .WithMany("ShipperAliases")
                         .HasForeignKey("ShipperId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("Shipper");
@@ -1091,11 +1113,18 @@ namespace PAFA.Infrastructure.Migrations
 
             modelBuilder.Entity("PAFA.Domain.Entities.Report", b =>
                 {
+                    b.HasOne("PAFA.Domain.Entities.IngestionJob", "IngestionJob")
+                        .WithMany()
+                        .HasForeignKey("IngestionJobId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
                     b.HasOne("PAFA.Domain.Entities.ReportType", "ReportType")
                         .WithMany("Reports")
                         .HasForeignKey("ReportTypeId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
+
+                    b.Navigation("IngestionJob");
 
                     b.Navigation("ReportType");
                 });
@@ -1140,6 +1169,8 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("MetricValues");
 
                     b.Navigation("ProductClasses");
+
+                    b.Navigation("ShipperAliases");
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.ReportType", b =>

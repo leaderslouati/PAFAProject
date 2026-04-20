@@ -3,11 +3,18 @@ using Microsoft.AspNetCore.SignalR;
 namespace PAFA.Api.Hubs;
 
 /// <summary>
-/// SignalR hub for real-time ingestion notifications.
-/// The frontend connects and receives:
-///   - "FileDownloaded"    ? file picked up from SFTP and saved to blob
-///   - "ProcessingComplete" ? file processed successfully
-///   - "ValidationError"    ? file failed validation (alert)
+/// SignalR hub pour les notifications temps réel du pipeline d'ingestion.
+///
+/// Événements émis vers le front (noms des méthodes SignalR) :
+///   "StepCompleted"  ? une étape vient de se terminer (succès ou échec)
+///   "PipelineStarted" ? un nouveau pipeline a démarré (liste de fileId en attente)
+///   "PipelineFinished" ? tous les fichiers d'un run sont traités
+///
+/// Le front écoute "StepCompleted" et met à jour son UI Processing Stages :
+///   Step 1 — FileImport   (SP?MinIO, Status=Downloaded)
+///   Step 2 — Parsing      (Status=Validating)
+///   Step 3 — Validation   (ValidationStatus set)
+///   Step 4 — Persistence  (Status=Loaded | Failed)
 /// </summary>
 public class IngestionHub : Hub
 {
@@ -27,3 +34,47 @@ public class IngestionHub : Hub
         return base.OnDisconnectedAsync(exception);
     }
 }
+
+// ?? Payloads SignalR ?????????????????????????????????????????????????????????
+
+/// <summary>
+/// Emis une fois par step, pour chaque fichier.
+/// Le front utilise <see cref="FileId"/> + <see cref="Step"/> pour mettre à jour la bonne case.
+/// </summary>
+public sealed record StepCompletedPayload(
+    /// <summary>Identifiant du fichier.</summary>
+    Guid FileId,
+    /// <summary>Nom du fichier (lisible pour le front).</summary>
+    string FileName,
+    /// <summary>Numéro de l'étape : 1=FileImport 2=Parsing 3=Validation 4=Persistence</summary>
+    int Step,
+    /// <summary>Label de l'étape : "FileImport" | "Parsing" | "Validation" | "Persistence"</summary>
+    string StepName,
+    /// <summary>"Success" | "Failed"</summary>
+    string Status,
+    /// <summary>Durée de l'étape en millisecondes.</summary>
+    long DurationMs,
+    /// <summary>Message d'erreur si Status = "Failed", null sinon.</summary>
+    string? ErrorMessage = null,
+    /// <summary>Données optionnelles propres à l'étape (ex: RowsRead, RowsValid…).</summary>
+    Dictionary<string, object?>? Details = null
+);
+
+/// <summary>Emis quand un run démarre (après POST /api/sharepoint/start).</summary>
+public sealed record PipelineStartedPayload(
+    Guid JobId,
+    int Year,
+    int Month,
+    int TotalFiles,
+    IReadOnlyList<Guid> FileIds
+);
+
+/// <summary>Emis quand tous les fichiers d'un run sont traités.</summary>
+public sealed record PipelineFinishedPayload(
+    Guid JobId,
+    int TotalFiles,
+    int Succeeded,
+    int Failed,
+    long TotalDurationMs
+);
+

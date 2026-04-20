@@ -56,8 +56,8 @@ metadata:
     app: pafa-batch
     component: data-ingestion
 spec:
-  # 1er du mois à 02:00 UTC — Xoserve publie les fichiers en début de mois
-  schedule: "0 2 1 * *"
+  # Jours 18-21 du mois à 02:00 UTC — fenêtre de traitement PAFA
+  schedule: "0 2 18-21 * *"
   timeZone: "UTC"
 
   successfulJobsHistoryLimit: 3

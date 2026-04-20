@@ -1,21 +1,23 @@
-using Azure.Identity;
+﻿using Azure.Identity;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Models.ODataErrors;
-using PAFA.Domain.Interfaces;
 
 namespace PAFA.Infrastructure.SharePoint;
 
 /// <summary>
-/// Impl�mentation de IRemoteFileSource pour SharePoint Online via Microsoft Graph API v5.
+/// Implémentation de IRemoteFileSource pour SharePoint Online via Microsoft Graph API v5.
 /// Utilise Client Credentials (App-Only) pour l'authentification OAuth 2.0.
 /// </summary>
 public sealed class SharePointFileSource : IRemoteFileSource
 {
     private readonly SharePointSettings _cfg;
     private readonly ILogger<SharePointFileSource> _log;
+
+    // Instance partagée pour éviter le socket exhaustion et permettre de retourner des flux réseau ouverts.
+    private static readonly HttpClient _httpClient = new HttpClient();
 
     public SharePointFileSource(
         IOptions<SharePointSettings> cfg,
@@ -32,13 +34,10 @@ public sealed class SharePointFileSource : IRemoteFileSource
         return new GraphServiceClient(credential);
     }
 
-    // ???????????????????????????????????????????????????????????????
-    //  R�solution du Drive ID au d�marrage
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
+    //  Résolution du Drive ID au démarrage
+    // ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Retourne le Drive ID configur�, ou le drive par d�faut du site.
-    /// </summary>
     private async Task<string> ResolveDriveIdAsync(GraphServiceClient graph, CancellationToken ct)
     {
         if (!string.IsNullOrEmpty(_cfg.DriveId))
@@ -51,9 +50,9 @@ public sealed class SharePointFileSource : IRemoteFileSource
         return drive!.Id!;
     }
 
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
     //  1. Lister les fichiers
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
 
     public async Task<IReadOnlyList<RemoteFileEntry>> ListFilesAsync(
         string remotePath, string filePattern = "*.xlsx", CancellationToken ct = default)
@@ -71,7 +70,7 @@ public sealed class SharePointFileSource : IRemoteFileSource
         if (children?.Value != null)
             allItems.AddRange(children.Value);
 
-        // Gestion pagination � Graph retourne max 200 items par page
+        // Gestion pagination — Graph retourne max 200 items par page
         while (children?.OdataNextLink != null)
         {
             children = await graph.Drives[driveId]
@@ -94,21 +93,21 @@ public sealed class SharePointFileSource : IRemoteFileSource
                 LastModified: i.LastModifiedDateTime?.DateTime ?? DateTime.UtcNow))
             .ToList();
 
-        _log.LogDebug("{Count} fichier(s) list�(s) dans SharePoint {Path}", result.Count, remotePath);
+        _log.LogDebug("{Count} fichier(s) listé(s) dans SharePoint {Path}", result.Count, remotePath);
         return result;
     }
 
-    // ???????????????????????????????????????????????????????????????
-    //  2. T�l�charger un fichier
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
+    //  2. Télécharger un fichier (CORRIGÉ POUR LE STREAMING)
+    // ───────────────────────────────────────────────────────────────
 
-    public async Task<byte[]> DownloadFileAsync(
+    public async Task<Stream> DownloadFileAsync(
         string remotePath, CancellationToken ct = default)
     {
         var graph = BuildClient();
         var driveId = await ResolveDriveIdAsync(graph, ct);
 
-        // R�cup�rer les m�tadonn�es pour v�rifier la taille
+        // Récupérer les métadonnées pour vérifier la taille
         var item = await graph.Drives[driveId]
             .Root
             .ItemWithPath(remotePath)
@@ -121,30 +120,29 @@ public sealed class SharePointFileSource : IRemoteFileSource
             urlObj is string downloadUrl &&
             !string.IsNullOrEmpty(downloadUrl))
         {
-            using var http = new HttpClient();
-            var bytes = await http.GetByteArrayAsync(downloadUrl, ct);
-            _log.LogDebug("T�l�charg� (large file) : {Path} ({Size:N0} bytes)", remotePath, bytes.Length);
-            return bytes;
+            // Retourne directement le flux réseau. 
+            // On utilise _httpClient statique pour que la connexion survive à la méthode.
+            var stream = await _httpClient.GetStreamAsync(downloadUrl, ct);
+            _log.LogDebug("Téléchargement (large file) initié via Stream : {Path}", remotePath);
+            return stream;
         }
 
-        // Fichier ? 4 Mo � download direct via Graph
-        var stream = await graph.Drives[driveId]
+        // Fichier ≤ 4 Mo — download direct via Graph API qui retourne nativement un Stream
+        var graphStream = await graph.Drives[driveId]
             .Root
             .ItemWithPath(remotePath)
             .Content
             .GetAsync(cancellationToken: ct);
 
-        using var ms = new MemoryStream();
-        await stream!.CopyToAsync(ms, ct);
-        var result = ms.ToArray();
+        _log.LogDebug("Téléchargement initié via Stream GraphAPI : {Path}", remotePath);
 
-        _log.LogDebug("T�l�charg� : {Path} ({Size:N0} bytes)", remotePath, result.Length);
-        return result;
+        // On retourne directement le flux, c'est l'appelant (le Handler) qui le fermera avec le "using" !
+        return graphStream!;
     }
 
-    // ???????????????????????????????????????????????????????????????
-    //  3. D�placer un fichier
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
+    //  3. Déplacer un fichier
+    // ───────────────────────────────────────────────────────────────
 
     public async Task MoveFileAsync(
         string sourcePath, string destinationPath, CancellationToken ct = default)
@@ -155,7 +153,6 @@ public sealed class SharePointFileSource : IRemoteFileSource
         var destFolder = Path.GetDirectoryName(destinationPath)!.Replace('\\', '/');
         var destName = Path.GetFileName(destinationPath);
 
-        // R�cup�rer le dossier destination (ou le cr�er)
         DriveItem? destItem;
         try
         {
@@ -166,11 +163,10 @@ public sealed class SharePointFileSource : IRemoteFileSource
         }
         catch (ODataError ex) when (ex.ResponseStatusCode == 404)
         {
-            _log.LogWarning("Dossier destination introuvable, cr�ation : {Path}", destFolder);
+            _log.LogWarning("Dossier destination introuvable, création : {Path}", destFolder);
             destItem = await CreateFolderRecursiveAsync(graph, driveId, destFolder, ct);
         }
 
-        // PATCH pour d�placer le fichier
         await graph.Drives[driveId]
             .Root
             .ItemWithPath(sourcePath)
@@ -180,12 +176,12 @@ public sealed class SharePointFileSource : IRemoteFileSource
                 Name = destName
             }, cancellationToken: ct);
 
-        _log.LogDebug("D�plac� : {Src} ? {Dst}", sourcePath, destinationPath);
+        _log.LogDebug("Déplacé : {Src} → {Dst}", sourcePath, destinationPath);
     }
 
-    // ???????????????????????????????????????????????????????????????
-    //  4. Test de connectivit�
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
+    //  4. Test de connectivité
+    // ───────────────────────────────────────────────────────────────
 
     public async Task<bool> TestConnectionAsync(CancellationToken ct = default)
     {
@@ -195,26 +191,22 @@ public sealed class SharePointFileSource : IRemoteFileSource
             var site = await graph.Sites[_cfg.SiteId]
                 .GetAsync(cancellationToken: ct);
 
-            _log.LogInformation("SharePoint connexion OK � Site: {Name} ({Url})",
+            _log.LogInformation("SharePoint connexion OK — Site: {Name} ({Url})",
                 site?.DisplayName, site?.WebUrl);
             return site != null;
         }
         catch (Exception ex)
         {
-            _log.LogError(ex, "SharePoint connexion �chou�e � TenantId: {TenantId}, SiteId: {SiteId}",
+            _log.LogError(ex, "SharePoint connexion échouée — TenantId: {TenantId}, SiteId: {SiteId}",
                 _cfg.TenantId, _cfg.SiteId);
             return false;
         }
     }
 
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
     //  Helpers
-    // ???????????????????????????????????????????????????????????????
+    // ───────────────────────────────────────────────────────────────
 
-    /// <summary>
-    /// Cr�e un dossier r�cursivement dans SharePoint.
-    /// Ex: "processed/2025/07" ? cr�e processed, puis 2025, puis 07.
-    /// </summary>
     private async Task<DriveItem> CreateFolderRecursiveAsync(
         GraphServiceClient graph, string driveId, string folderPath, CancellationToken ct)
     {
@@ -248,7 +240,6 @@ public sealed class SharePointFileSource : IRemoteFileSource
 
                 if (string.IsNullOrEmpty(parentPath))
                 {
-                    // Cr�er � la racine du drive
                     current = await graph.Drives[driveId]
                         .Items["root"]
                         .Children
@@ -263,7 +254,7 @@ public sealed class SharePointFileSource : IRemoteFileSource
                         .PostAsync(newFolder, cancellationToken: ct);
                 }
 
-                _log.LogInformation("Dossier cr�� dans SharePoint : {Path}", currentPath);
+                _log.LogInformation("Dossier créé dans SharePoint : {Path}", currentPath);
             }
         }
 
@@ -277,7 +268,7 @@ public sealed class SharePointFileSource : IRemoteFileSource
         if (pattern == "*")
         {
             var ext = Path.GetExtension(fileName).ToLowerInvariant();
-            return ext is ".xlsx" or ".xls" or ".csv" or ".xml";
+            return ext is ".xlsx" or ".xls";
         }
 
         if (pattern.StartsWith("*"))

@@ -21,4 +21,11 @@ public class BlobStorageSettings
 
     /// <summary>Use SSL for MinIO connection</summary>
     public bool UseSsl { get; set; } = false;
+
+    /// <summary>
+    /// Base bucket name to use as root for PAFA data. When set, legacy containers
+    /// (landing-zone / processed / failed / processing) are mapped to prefixes
+    /// inside this bucket: inbound / archive / quarantine / processing.
+    /// </summary>
+    public string BaseBucketName { get; set; } = "data";
 }
