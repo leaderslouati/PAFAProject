@@ -1,0 +1,2305 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Report MustUnderstand="df" xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition" xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner" xmlns:df="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition/defaultfontfamily" xmlns:am="http://schemas.microsoft.com/sqlserver/reporting/authoringmetadata">
+  <rd:ReportUnitType>Cm</rd:ReportUnitType>
+  <rd:ReportID>9243e0fe-e347-4a29-9520-102fc7f99efe</rd:ReportID>
+  <am:AuthoringMetadata>
+    <am:CreatedBy>
+      <am:Name>PBIRB</am:Name>
+      <am:Version>15.7.1817.11</am:Version>
+    </am:CreatedBy>
+    <am:UpdatedBy>
+      <am:Name>PBIRB</am:Name>
+      <am:Version>15.7.1817.11</am:Version>
+    </am:UpdatedBy>
+    <am:LastModifiedTimestamp>2026-04-22T15:55:43.9961173Z</am:LastModifiedTimestamp>
+  </am:AuthoringMetadata>
+  <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
+  <AutoRefresh>0</AutoRefresh>
+  <DataSources>
+    <DataSource Name="DataSource1">
+      <rd:SecurityType>DataBase</rd:SecurityType>
+      <ConnectionProperties>
+        <DataProvider>ODBC</DataProvider>
+        <ConnectString>Driver={PostgreSQL UNICODE};database=pafadb;server=localhost;</ConnectString>
+        <Prompt>Spécifiez un nom d'utilisateur et un mot de passe pour la source de données DataSource1 :</Prompt>
+      </ConnectionProperties>
+      <rd:DataSourceID>957db21b-8e63-4f12-808d-22c333fb5c56</rd:DataSourceID>
+    </DataSource>
+  </DataSources>
+  <DataSets>
+    <DataSet Name="MonthlyAverages">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <rd:UseGenericDesigner>true</rd:UseGenericDesigner>
+        <CommandText>WITH MonthlyAverages AS (
+    -- On calcule d'abord la moyenne par mois et par shipper
+    SELECT 
+        shipper_code,
+        report_month,
+        AVG(estimated_pct) as current_val
+    FROM public.v_parr_industry
+    GROUP BY shipper_code, report_month
+),
+MoMCalculation AS (
+    -- On récupère la valeur du mois précédent avec LAG
+    SELECT 
+        shipper_code,
+        report_month,
+        current_val,
+        LAG(current_val) OVER (PARTITION BY shipper_code ORDER BY report_month) as prev_val
+    FROM MonthlyAverages
+)
+-- On fait le calcul final du pourcentage de changement
+SELECT 
+    shipper_code,
+    report_month,
+    current_val,
+    prev_val,
+    CASE 
+        WHEN prev_val = 0 OR prev_val IS NULL THEN NULL 
+        ELSE ((current_val - prev_val) / prev_val) * 100 
+    END as mom_change_pct
+FROM MoMCalculation
+ORDER BY report_month DESC, shipper_code;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="report_month">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="current_val">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>current_val</DataField>
+        </Field>
+        <Field Name="prev_val">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>prev_val</DataField>
+        </Field>
+        <Field Name="mom_change_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>mom_change_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="Vue_parr_industry">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>select * from public.v_parr_industry ; </CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="report_month">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="report_date">
+          <rd:TypeName>System.DateTime</rd:TypeName>
+          <DataField>report_date</DataField>
+        </Field>
+        <Field Name="product_class">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>product_class</DataField>
+        </Field>
+        <Field Name="read_perf_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>read_perf_pct</DataField>
+        </Field>
+        <Field Name="estimated_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>estimated_pct</DataField>
+        </Field>
+        <Field Name="check_read_count">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>check_read_count</DataField>
+        </Field>
+        <Field Name="total_sites">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>total_sites</DataField>
+        </Field>
+        <Field Name="is_compliant">
+          <rd:TypeName>System.Int32</rd:TypeName>
+          <DataField>is_compliant</DataField>
+        </Field>
+        <Field Name="unc_threshold">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>unc_threshold</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="ComplianceRate">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>SELECT 
+    -- Vos colonnes de regroupement (à adapter selon vos besoins)
+    report_month, 
+    shipper_code,
+    
+    -- L'équivalent de votre mesure [Compliance Rate]
+    CAST(COUNT(*) FILTER (WHERE is_compliant = 1) AS NUMERIC) 
+    / NULLIF(COUNT(*), 0) AS compliance_rate
+
+FROM public.v_parr_industry
+GROUP BY 
+    report_month, 
+    shipper_code;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="report_month">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="compliance_rate">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>compliance_rate</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="MoM_Change">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MoyenneMensuelle AS (
+    SELECT 
+        report_month,
+        shipper_code,
+        AVG(estimated_pct) AS current_val
+    FROM public.v_parr_industry
+    GROUP BY report_month, shipper_code
+),
+ValeurPrecedente AS (
+    SELECT 
+        report_month,
+        shipper_code,
+        current_val,
+        -- Récupère la valeur du mois précédent chronologiquement
+        LAG(current_val) OVER (PARTITION BY shipper_code ORDER BY report_month) AS prev_val
+    FROM MoyenneMensuelle
+)
+SELECT 
+    report_month,
+    shipper_code,
+    CASE 
+        WHEN prev_val = 0 OR prev_val IS NULL THEN NULL 
+        ELSE ((current_val - prev_val) / prev_val) * 100 
+    END AS "MoM Change %"
+FROM ValeurPrecedente;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="report_month">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="MoM_Change__">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>MoM Change %</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="Vue_2a_distribution">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>select * from public.vw_2a1_distribution ; </CommandText>
+      </Query>
+      <Fields>
+        <Field Name="report_month">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="product_class">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>product_class</DataField>
+        </Field>
+        <Field Name="pct_bin">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>pct_bin</DataField>
+        </Field>
+        <Field Name="shipper_count">
+          <rd:TypeName>System.Int64</rd:TypeName>
+          <DataField>shipper_count</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="Dim_Date">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>select * from public.vw_dim_date ; </CommandText>
+      </Query>
+      <Fields>
+        <Field Name="date_key">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>date_key</DataField>
+        </Field>
+        <Field Name="month_year">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>month_year</DataField>
+        </Field>
+        <Field Name="year">
+          <rd:TypeName>System.Int32</rd:TypeName>
+          <DataField>year</DataField>
+        </Field>
+        <Field Name="month_num">
+          <rd:TypeName>System.Int32</rd:TypeName>
+          <DataField>month_num</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="Dim_shipper">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>select * from vw_dim_shipper ; </CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="real_shipper_name">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>real_shipper_name</DataField>
+        </Field>
+        <Field Name="alias_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>alias_code</DataField>
+        </Field>
+        <Field Name="is_active">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>is_active</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Estimated_Evolution">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>SELECT 
+    CAST(report_month || '-01' AS DATE) AS report_month,
+    product_class, -- Colonne identifiant PC1 ou PC2
+    AVG(estimated_pct) / 100.0 AS estimated_reads_pct
+FROM public.v_parr_industry
+WHERE product_class IN ('PC1', 'PC2')
+GROUP BY report_month, product_class
+ORDER BY report_month ASC;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="report_month">
+          <rd:TypeName>System.DateTime</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="product_class">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>product_class</DataField>
+        </Field>
+        <Field Name="estimated_reads_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>estimated_reads_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_CheckReads_Count">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>SELECT 
+    CAST(report_month || '-01' AS DATE) AS report_month,
+    product_class, 
+    COUNT(*) AS count_check_reads
+FROM public.v_parr_industry
+WHERE is_compliant = 0 -- Filtre les relevés non conformes / non fournis
+AND product_class IN ('PC1', 'PC2')
+GROUP BY report_month, product_class
+ORDER BY report_month ASC;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="report_month">
+          <rd:TypeName>System.DateTime</rd:TypeName>
+          <DataField>report_month</DataField>
+        </Field>
+        <Field Name="product_class">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>product_class</DataField>
+        </Field>
+        <Field Name="count_check_reads">
+          <rd:TypeName>System.Int64</rd:TypeName>
+          <DataField>count_check_reads</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Industry_KPIs">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MonthlyData AS (
+    SELECT 
+        report_month,
+        AVG(estimated_pct) / 100.0 AS avg_val
+    FROM public.v_parr_industry
+    GROUP BY report_month
+),
+Changes AS (
+    SELECT 
+        report_month,
+        avg_val as current_val,
+        LAG(avg_val, 1) OVER (ORDER BY report_month) as prev_month_val,
+        LAG(avg_val, 12) OVER (ORDER BY report_month) as prev_year_val
+    FROM MonthlyData
+)
+SELECT 
+    (current_val - prev_month_val) * 100 as monthly_change,
+    (current_val - prev_year_val) * 100 as annual_change
+FROM Changes
+ORDER BY report_month DESC
+LIMIT 1; -- On ne garde que le dernier mois connu</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="monthly_change">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>monthly_change</DataField>
+        </Field>
+        <Field Name="annual_change">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>annual_change</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Shipper_Ranking">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MoM AS (
+    SELECT 
+        shipper_code,
+        report_month,
+        AVG(estimated_pct) / 100.0 as current_val,
+        LAG(AVG(estimated_pct) / 100.0) OVER (PARTITION BY shipper_code ORDER BY report_month) as prev_val
+    FROM public.v_parr_industry
+    GROUP BY shipper_code, report_month
+)
+SELECT 
+    shipper_code,
+    (current_val - prev_val) * 100 as change_pct
+FROM MoM
+WHERE report_month = (SELECT MAX(report_month) FROM public.v_parr_industry)
+ORDER BY ABS((current_val - prev_val) * 100) DESC;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="change_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>change_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_KPI_PC1">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MonthlyData AS (
+    SELECT report_month, AVG(estimated_pct)/100.0 AS avg_val
+    FROM public.v_parr_industry 
+    WHERE product_class = 'PC1'
+    GROUP BY report_month
+),
+Changes AS (
+    SELECT report_month,
+           (avg_val - LAG(avg_val, 1) OVER (ORDER BY report_month)) * 100 as monthly_change,
+           (avg_val - LAG(avg_val, 12) OVER (ORDER BY report_month)) * 100 as annual_change
+    FROM MonthlyData
+)
+SELECT monthly_change, annual_change FROM Changes
+ORDER BY report_month DESC LIMIT 1;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="monthly_change">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>monthly_change</DataField>
+        </Field>
+        <Field Name="annual_change">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>annual_change</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Top_PC1">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MoM AS (
+    SELECT shipper_code, report_month,
+           (AVG(estimated_pct)/100.0) as current_val,
+           LAG(AVG(estimated_pct)/100.0) OVER (PARTITION BY shipper_code ORDER BY report_month) as prev_val
+    FROM public.v_parr_industry 
+    WHERE product_class = 'PC1'
+    GROUP BY shipper_code, report_month
+)
+SELECT shipper_code, (current_val - prev_val) * 100 as change_pct
+FROM MoM
+WHERE report_month = (SELECT MAX(report_month) FROM public.v_parr_industry)
+AND (current_val - prev_val) &lt; 0
+ORDER BY change_pct ASC LIMIT 3;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="change_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>change_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Bottom_PC1">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MoM AS (
+    SELECT shipper_code, report_month,
+           (AVG(estimated_pct)/100.0) as current_val,
+           LAG(AVG(estimated_pct)/100.0) OVER (PARTITION BY shipper_code ORDER BY report_month) as prev_val
+    FROM public.v_parr_industry 
+    WHERE product_class = 'PC1'
+    GROUP BY shipper_code, report_month
+)
+SELECT shipper_code, (current_val - prev_val) * 100 as change_pct
+FROM MoM
+WHERE report_month = (SELECT MAX(report_month) FROM public.v_parr_industry)
+AND (current_val - prev_val) &lt; 0
+ORDER BY change_pct ASC LIMIT 3;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="change_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>change_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_KPI_PC2">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MonthlyData AS (
+    SELECT report_month, AVG(estimated_pct)/100.0 AS avg_val
+    FROM public.v_parr_industry 
+    WHERE product_class = 'PC2'
+    GROUP BY report_month
+),
+Changes AS (
+    SELECT report_month,
+           (avg_val - LAG(avg_val, 1) OVER (ORDER BY report_month)) * 100 as monthly_change,
+           (avg_val - LAG(avg_val, 12) OVER (ORDER BY report_month)) * 100 as annual_change
+    FROM MonthlyData
+)
+SELECT monthly_change, annual_change FROM Changes
+ORDER BY report_month DESC LIMIT 1;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="monthly_change">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>monthly_change</DataField>
+        </Field>
+        <Field Name="annual_change">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>annual_change</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Top_PC2">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MoM AS (
+    SELECT shipper_code, report_month,
+           (AVG(estimated_pct)/100.0) as current_val,
+           LAG(AVG(estimated_pct)/100.0) OVER (PARTITION BY shipper_code ORDER BY report_month) as prev_val
+    FROM public.v_parr_industry WHERE product_class = 'PC2'
+    GROUP BY shipper_code, report_month
+)
+SELECT shipper_code, (current_val - prev_val) * 100 as change_pct
+FROM MoM
+WHERE report_month = (SELECT MAX(report_month) FROM public.v_parr_industry)
+AND (current_val - prev_val) &gt; 0
+ORDER BY change_pct DESC LIMIT 3;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="change_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>change_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Bottom_PC2">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH MoM AS (
+    SELECT shipper_code, report_month,
+           (AVG(estimated_pct)/100.0) as current_val,
+           LAG(AVG(estimated_pct)/100.0) OVER (PARTITION BY shipper_code ORDER BY report_month) as prev_val
+    FROM public.v_parr_industry 
+    WHERE product_class = 'PC2'
+    GROUP BY shipper_code, report_month
+)
+SELECT shipper_code, (current_val - prev_val) * 100 as change_pct
+FROM MoM
+WHERE report_month = (SELECT MAX(report_month) FROM public.v_parr_industry)
+AND (current_val - prev_val) &lt; 0
+ORDER BY change_pct ASC LIMIT 3;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>shipper_code</DataField>
+        </Field>
+        <Field Name="change_pct">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>change_pct</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DS_Density_PC1">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>WITH RawData AS (
+    -- On récupère uniquement les données des 2 mois à comparer pour PC1
+    SELECT 
+        shipper_code,
+        report_month,
+        estimated_pct
+    FROM public.v_parr_industry
+    WHERE product_class = 'PC1' 
+    AND report_month IN ('2025-02', '2026-02') -- À adapter selon le format de votre base
+),
+BinnedData AS (
+    -- On regroupe les pourcentages par tranches de 2% pour créer les points de la courbe
+    SELECT 
+        CASE WHEN report_month = '2026-02' THEN 'Feb-26' ELSE 'Feb-25' END as month_label,
+        ROUND(CAST(estimated_pct AS numeric) / 2.0) * 2.0 as pct_bin,
+        COUNT(DISTINCT shipper_code) as density_count
+    FROM RawData
+    GROUP BY report_month, ROUND(CAST(estimated_pct AS numeric) / 2.0) * 2.0
+)
+SELECT * FROM BinnedData 
+ORDER BY month_label, pct_bin;</CommandText>
+      </Query>
+      <Fields>
+        <Field Name="month_label">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>month_label</DataField>
+        </Field>
+        <Field Name="pct_bin">
+          <rd:TypeName>System.Decimal</rd:TypeName>
+          <DataField>pct_bin</DataField>
+        </Field>
+        <Field Name="density_count">
+          <rd:TypeName>System.Int64</rd:TypeName>
+          <DataField>density_count</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <ReportItems>
+          <Textbox Name="ReportTitle">
+            <rd:WatermarkTextbox>Title</rd:WatermarkTextbox>
+            <rd:DefaultName>ReportTitle</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>2A.1 ESTIMATED &amp; CHECK READS- PRODUCT CLASSES 1&amp;2 </Value>
+                    <Style>
+                      <FontFamily>Arial</FontFamily>
+                      <FontSize>18pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>Brown</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>3.175mm</Top>
+            <Left>2.36764cm</Left>
+            <Height>10.16mm</Height>
+            <Width>272.64484mm</Width>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Chart Name="Chart2">
+            <ChartCategoryHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart2_CategoryGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!report_month.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!report_month.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <Label>=Fields!report_month.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartCategoryHierarchy>
+            <ChartSeriesHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart2_SeriesGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!product_class.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!product_class.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <Label>=Fields!product_class.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartSeriesHierarchy>
+            <ChartData>
+              <ChartSeriesCollection>
+                <ChartSeries Name="estimated_reads_pct">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!estimated_reads_pct.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style>
+                        <Border>
+                          <Width>2.5pt</Width>
+                        </Border>
+                        <Color>=IIF(Fields!product_class.Value = "PC1", "#4472C4", "#ED7D31")</Color>
+                        <BackgroundGradientType>None</BackgroundGradientType>
+                        <BackgroundGradientEndColor>#ed7d31</BackgroundGradientEndColor>
+                        <BackgroundHatchType>None</BackgroundHatchType>
+                      </Style>
+                      <ChartMarker>
+                        <Type>Circle</Type>
+                        <Size>6pt</Size>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Type>Line</Type>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+              </ChartSeriesCollection>
+            </ChartData>
+            <ChartAreas>
+              <ChartArea Name="Default">
+                <ChartCategoryAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Format>MMM-yy</Format>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <Angle>-45</Angle>
+                    <LabelsAutoFitDisabled>true</LabelsAutoFitDisabled>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                </ChartCategoryAxes>
+                <ChartValueAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Format>0.00%</Format>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption>Percentage</Caption>
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <Interval>0.02</Interval>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>0</Minimum>
+                    <Maximum>0.18</Maximum>
+                    <IncludeZero>false</IncludeZero>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                </ChartValueAxes>
+                <Style>
+                  <BackgroundColor>#00ffffff</BackgroundColor>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                </Style>
+              </ChartArea>
+            </ChartAreas>
+            <ChartLegends>
+              <ChartLegend Name="Default">
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>8pt</FontSize>
+                </Style>
+                <Position>BottomCenter</Position>
+                <DockOutsideChartArea>true</DockOutsideChartArea>
+                <ChartLegendTitle>
+                  <Caption />
+                  <Style>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Bold</FontWeight>
+                    <TextAlign>Center</TextAlign>
+                  </Style>
+                </ChartLegendTitle>
+                <HeaderSeparatorColor>Black</HeaderSeparatorColor>
+                <ColumnSeparatorColor>Black</ColumnSeparatorColor>
+              </ChartLegend>
+            </ChartLegends>
+            <ChartTitles>
+              <ChartTitle Name="Default">
+                <Caption>2A.1 Percentage of Estimated Reads for PC1 &amp; PC2</Caption>
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>9pt</FontSize>
+                  <FontWeight>Normal</FontWeight>
+                  <TextAlign>Left</TextAlign>
+                  <VerticalAlign>Top</VerticalAlign>
+                  <Color>#a6a6a6</Color>
+                </Style>
+              </ChartTitle>
+            </ChartTitles>
+            <Palette>Pacific</Palette>
+            <ChartBorderSkin>
+              <Style>
+                <BackgroundColor>Gray</BackgroundColor>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <Color>White</Color>
+              </Style>
+            </ChartBorderSkin>
+            <ChartNoDataMessage Name="NoDataMessage">
+              <Caption>Aucune donnée disponible</Caption>
+              <Style>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <FontWeight>Bold</FontWeight>
+                <TextAlign>General</TextAlign>
+                <VerticalAlign>Top</VerticalAlign>
+              </Style>
+            </ChartNoDataMessage>
+            <DataSetName>DS_Estimated_Evolution</DataSetName>
+            <Top>27.54884mm</Top>
+            <Left>215.94838mm</Left>
+            <Height>57.08252mm</Height>
+            <Width>108.91768mm</Width>
+            <ZIndex>1</ZIndex>
+            <Style>
+              <Border>
+                <Color>Brown</Color>
+                <Style>None</Style>
+              </Border>
+              <BackgroundColor>White</BackgroundColor>
+              <BackgroundGradientType>None</BackgroundGradientType>
+            </Style>
+          </Chart>
+          <Textbox Name="Textbox1">
+            <rd:DefaultName>Textbox1</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Report measures the average percentage across all Shippers portfolio in each market, where estimated reads were provided. Count of each Shippers portfolio where check reads were not provided</Value>
+                    <Style>
+                      <FontFamily>Arial</FontFamily>
+                      <FontSize>9pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>16.96559mm</Top>
+            <Left>12.06498mm</Left>
+            <Height>14.224mm</Height>
+            <Width>217.88361mm</Width>
+            <ZIndex>2</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Chart Name="Chart4">
+            <ChartCategoryHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart4_CategoryGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!report_month.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!report_month.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <Label>=Fields!report_month.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartCategoryHierarchy>
+            <ChartSeriesHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart4_SeriesGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!product_class.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!product_class.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <Label>=Fields!product_class.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartSeriesHierarchy>
+            <ChartData>
+              <ChartSeriesCollection>
+                <ChartSeries Name="count_check_reads">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!count_check_reads.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style>
+                        <Border>
+                          <Width>2.5pt</Width>
+                        </Border>
+                        <Color>=IIF(Fields!product_class.Value = "PC1", "#4472C4", "#ED7D31")</Color>
+                      </Style>
+                      <ChartMarker>
+                        <Type>Circle</Type>
+                        <Size>6pt</Size>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Type>Line</Type>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+              </ChartSeriesCollection>
+            </ChartData>
+            <ChartAreas>
+              <ChartArea Name="Default">
+                <ChartCategoryAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Format>MMM-yy</Format>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <Reverse>true</Reverse>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <Angle>-45</Angle>
+                    <LabelsAutoFitDisabled>true</LabelsAutoFitDisabled>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                </ChartCategoryAxes>
+                <ChartValueAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <Interval>50</Interval>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>0</Minimum>
+                    <Maximum>300</Maximum>
+                    <IncludeZero>false</IncludeZero>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                </ChartValueAxes>
+                <Style>
+                  <BackgroundColor>#00ffffff</BackgroundColor>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                </Style>
+              </ChartArea>
+            </ChartAreas>
+            <ChartLegends>
+              <ChartLegend Name="Default">
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>8pt</FontSize>
+                </Style>
+                <Position>BottomCenter</Position>
+                <DockOutsideChartArea>true</DockOutsideChartArea>
+                <ChartLegendTitle>
+                  <Caption />
+                  <Style>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Bold</FontWeight>
+                    <TextAlign>Center</TextAlign>
+                  </Style>
+                </ChartLegendTitle>
+                <HeaderSeparatorColor>Black</HeaderSeparatorColor>
+                <ColumnSeparatorColor>Black</ColumnSeparatorColor>
+              </ChartLegend>
+            </ChartLegends>
+            <ChartTitles>
+              <ChartTitle Name="Default">
+                <Caption>2A.1 Count of Check Reads not completed for PC1 and
+PC2</Caption>
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>9pt</FontSize>
+                  <FontWeight>Normal</FontWeight>
+                  <TextAlign>Left</TextAlign>
+                  <VerticalAlign>Top</VerticalAlign>
+                  <Color>#a6a6a6</Color>
+                </Style>
+              </ChartTitle>
+              <ChartTitle Name="Title1">
+                <Caption>COUNT</Caption>
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>9pt</FontSize>
+                  <FontWeight>Normal</FontWeight>
+                  <TextAlign>Left</TextAlign>
+                  <VerticalAlign>Top</VerticalAlign>
+                  <Color>#a6a6a6</Color>
+                </Style>
+                <Position>LeftCenter</Position>
+                <DockOutsideChartArea>true</DockOutsideChartArea>
+              </ChartTitle>
+            </ChartTitles>
+            <Palette>Pacific</Palette>
+            <ChartBorderSkin>
+              <Style>
+                <BackgroundColor>Gray</BackgroundColor>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <Color>White</Color>
+              </Style>
+            </ChartBorderSkin>
+            <ChartNoDataMessage Name="NoDataMessage">
+              <Caption>Aucune donnée disponible</Caption>
+              <Style>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <FontWeight>Bold</FontWeight>
+                <TextAlign>General</TextAlign>
+                <VerticalAlign>Top</VerticalAlign>
+              </Style>
+            </ChartNoDataMessage>
+            <DataSetName>DS_CheckReads_Count</DataSetName>
+            <Top>9.06135cm</Top>
+            <Left>21.59484cm</Left>
+            <Height>5.13442cm</Height>
+            <Width>10.8706cm</Width>
+            <ZIndex>3</ZIndex>
+            <Style>
+              <Border>
+                <Color>LightGrey</Color>
+                <Style>None</Style>
+              </Border>
+              <BackgroundColor>White</BackgroundColor>
+              <BackgroundGradientType>None</BackgroundGradientType>
+            </Style>
+          </Chart>
+          <Textbox Name="Textbox2">
+            <rd:DefaultName>Textbox2</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Observations:
+-The number of uncompleted check reads in PC2 has shown a slight decrease from the previous month.
+-The percentage of estimated reads in both PC1 has shown a slight increase in February compared to the previous months, whilst PC2 has shown a decrease. Both will continue to be monitored..</Value>
+                    <Style>
+                      <FontSize>9pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>9.95559cm</Top>
+            <Left>0.3175cm</Left>
+            <Height>2.22935cm</Height>
+            <Width>20.64536cm</Width>
+            <ZIndex>4</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Textbox Name="Textbox3">
+            <rd:DefaultName>Textbox3</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Industry movement</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>- </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>Monthly change</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <TextDecoration>None</TextDecoration>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value xml:space="preserve"> </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "↑ ", "↓ ") &amp; Format(Abs(First(Fields!monthly_change.Value, "DS_KPI_PC1")), "0.00") &amp; "%"</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>- </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>Annual change </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <TextDecoration>None</TextDecoration>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=IIF(First(Fields!annual_change.Value, "DS_KPI_PC1") &gt; 0, "↑ ", "↓ ") &amp; Format(Abs(First(Fields!annual_change.Value, "DS_KPI_PC1")), "0.00") &amp; "%"</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>5.64303cm</Top>
+            <Left>1.32503cm</Left>
+            <Height>1.68417cm</Height>
+            <Width>5.2705cm</Width>
+            <ZIndex>5</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Textbox Name="Textbox17">
+            <rd:DefaultName>Textbox17</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Monthly changes</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>7.4422cm</Top>
+            <Left>1.0922cm</Left>
+            <Height>0.635cm</Height>
+            <Width>4.61433cm</Width>
+            <ZIndex>6</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Tablix Name="Tablix3">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.38924cm</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>3.01908cm</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.80433cm</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="change_pct">
+                          <rd:DefaultName>change_pct</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=IIF(Fields!change_pct.Value &gt; 0, "↑ ", "↓ ") &amp; Format(Abs(Fields!change_pct.Value), "0.00") &amp; "%"</Value>
+                                  <Style>
+                                    <Color>=IIF(Fields!change_pct.Value &gt; 0, "#C00000", "#548235")</Color>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="shipper_code">
+                          <rd:DefaultName>shipper_code</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!shipper_code.Value</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="Détails" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>DS_Top_PC1</DataSetName>
+            <Top>8.37353cm</Top>
+            <Left>1.2065cm</Left>
+            <Height>0.80433cm</Height>
+            <Width>4.40832cm</Width>
+            <ZIndex>7</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+          <Textbox Name="Textbox4">
+            <rd:DefaultName>Textbox3</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Industry movement:</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>- </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value xml:space="preserve"> </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>Monthly change</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <TextDecoration>None</TextDecoration>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value xml:space="preserve"> </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC2") &gt; 0, "↑ ", "↓ ") &amp; Format(Abs(First(Fields!monthly_change.Value, "DS_KPI_PC2")), "0.00") &amp; "%"</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>-  </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>Annual change</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value xml:space="preserve"> </Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                  <TextRun>
+                    <Value>=IIF(First(Fields!annual_change.Value, "DS_KPI_PC2") &gt; 0, "↑ ", "↓ ") &amp; Format(Abs(First(Fields!annual_change.Value, "DS_KPI_PC2")), "0.00") &amp; "%"</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>5.54214cm</Top>
+            <Left>12.03466cm</Left>
+            <Height>1.78506cm</Height>
+            <Width>6.35cm</Width>
+            <ZIndex>8</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Textbox Name="Textbox18">
+            <rd:DefaultName>Textbox17</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>Monthly changes</Value>
+                    <Style>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>=IIF(First(Fields!monthly_change.Value, "DS_KPI_PC1") &gt; 0, "#C00000", "#548235")</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>7.34131cm</Top>
+            <Left>11.80183cm</Left>
+            <Height>0.635cm</Height>
+            <Width>4.61433cm</Width>
+            <ZIndex>9</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Tablix Name="Tablix4">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.69156cm</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>2.19957cm</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.80433cm</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="change_pct2">
+                          <rd:DefaultName>change_pct</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=IIF(Fields!change_pct.Value &gt; 0, "↑ ", "↓ ") &amp; Format(System.Math.Abs(Fields!change_pct.Value), "0.00") &amp; "%"</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="shipper_code2">
+                          <rd:DefaultName>shipper_code</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!shipper_code.Value</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="Détails2" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>DS_Top_PC2</DataSetName>
+            <Top>8.27264cm</Top>
+            <Left>11.65367cm</Left>
+            <Height>0.80433cm</Height>
+            <Width>3.89113cm</Width>
+            <ZIndex>10</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+          <Textbox Name="Textbox28">
+            <rd:DefaultName>Textbox28</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>PC1</Value>
+                    <Style>
+                      <FontSize>18pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>Red</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>4.2672cm</Top>
+            <Left>1.6637cm</Left>
+            <Height>0.88194cm</Height>
+            <Width>4.36033cm</Width>
+            <ZIndex>11</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Textbox Name="Textbox30">
+            <rd:DefaultName>Textbox28</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>PC2</Value>
+                    <Style>
+                      <FontSize>18pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>Red</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style>
+                  <TextAlign>Center</TextAlign>
+                </Style>
+              </Paragraph>
+            </Paragraphs>
+            <Top>4.2672cm</Top>
+            <Left>12.05583cm</Left>
+            <Height>0.88194cm</Height>
+            <Width>4.36033cm</Width>
+            <ZIndex>12</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+          <Tablix Name="Tablix5">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.55222cm</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>3.18206cm</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.80433cm</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="change_pct3">
+                          <rd:DefaultName>change_pct</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=IIF(Fields!change_pct.Value &gt; 0, "↑ ", "↓ ") &amp; Format(System.Math.Abs(Fields!change_pct.Value), "0.00") &amp; "%"</Value>
+                                  <Style>
+                                    <Color>=IIF(Fields!change_pct.Value &gt; 0, "#C00000", "#548235")</Color>
+                                  </Style>
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="shipper_code3">
+                          <rd:DefaultName>shipper_code</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!shipper_code.Value</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="Détails3" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>DS_Bottom_PC1</DataSetName>
+            <Top>8.37353cm</Top>
+            <Left>5.77992cm</Left>
+            <Height>0.80433cm</Height>
+            <Width>4.73428cm</Width>
+            <ZIndex>13</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+          <Tablix Name="Tablix6">
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn>
+                  <Width>1.61572cm</Width>
+                </TablixColumn>
+                <TablixColumn>
+                  <Width>2.15839cm</Width>
+                </TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <TablixRow>
+                  <Height>0.80433cm</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="change_pct4">
+                          <rd:DefaultName>change_pct</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=IIF(Fields!change_pct.Value &gt; 0, "↑ ", "↓ ") &amp; Format(System.Math.Abs(Fields!change_pct.Value), "0.00") &amp; "%"</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="shipper_code4">
+                          <rd:DefaultName>shipper_code</rd:DefaultName>
+                          <CanGrow>true</CanGrow>
+                          <KeepTogether>true</KeepTogether>
+                          <Paragraphs>
+                            <Paragraph>
+                              <TextRuns>
+                                <TextRun>
+                                  <Value>=Fields!shipper_code.Value</Value>
+                                  <Style />
+                                </TextRun>
+                              </TextRuns>
+                              <Style />
+                            </Paragraph>
+                          </Paragraphs>
+                          <Style>
+                            <Border>
+                              <Style>None</Style>
+                            </Border>
+                            <PaddingLeft>2pt</PaddingLeft>
+                            <PaddingRight>2pt</PaddingRight>
+                            <PaddingTop>2pt</PaddingTop>
+                            <PaddingBottom>2pt</PaddingBottom>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember />
+                <TablixMember />
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <TablixMember>
+                  <Group Name="Détails4" />
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+            <DataSetName>DS_Bottom_PC2</DataSetName>
+            <Top>8.33614cm</Top>
+            <Left>15.58008cm</Left>
+            <Height>0.80433cm</Height>
+            <Width>3.77411cm</Width>
+            <ZIndex>14</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+            </Style>
+          </Tablix>
+          <Textbox Name="Textbox5">
+            <rd:DefaultName>Textbox5</rd:DefaultName>
+            <CanGrow>true</CanGrow>
+            <KeepTogether>true</KeepTogether>
+            <Paragraphs>
+              <Paragraph>
+                <TextRuns>
+                  <TextRun>
+                    <Value>2A.1 ESTIMATED &amp; CHECK READS - PRODUCT CLASSES 1 &amp; 2</Value>
+                    <Style>
+                      <FontSize>18pt</FontSize>
+                      <FontWeight>Bold</FontWeight>
+                      <Color>Brown</Color>
+                    </Style>
+                  </TextRun>
+                </TextRuns>
+                <Style />
+              </Paragraph>
+            </Paragraphs>
+            <Top>18.01708cm</Top>
+            <Left>3.52637cm</Left>
+            <Height>1.35607cm</Height>
+            <Width>20.07225cm</Width>
+            <ZIndex>15</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <PaddingLeft>2pt</PaddingLeft>
+              <PaddingRight>2pt</PaddingRight>
+              <PaddingTop>2pt</PaddingTop>
+              <PaddingBottom>2pt</PaddingBottom>
+            </Style>
+          </Textbox>
+        </ReportItems>
+        <Height>228.93867mm</Height>
+        <Style>
+          <Border>
+            <Style>None</Style>
+          </Border>
+        </Style>
+      </Body>
+      <Width>351.11274mm</Width>
+      <Page>
+        <PageHeight>19.05cm</PageHeight>
+        <PageWidth>33.86cm</PageWidth>
+        <ColumnSpacing>0.13cm</ColumnSpacing>
+        <Style />
+      </Page>
+    </ReportSection>
+  </ReportSections>
+  <ReportParametersLayout>
+    <GridLayoutDefinition>
+      <NumberOfColumns>4</NumberOfColumns>
+      <NumberOfRows>2</NumberOfRows>
+    </GridLayoutDefinition>
+  </ReportParametersLayout>
+</Report>

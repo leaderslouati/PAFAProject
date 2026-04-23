@@ -18,6 +18,7 @@ public class UnitOfWork(PafaDbContext ctx) : IUnitOfWork
     public IShipperRepository Shippers { get; } = new ShipperRepository(ctx);
     public IReportRepository Reports { get; } = new ReportRepository(ctx);
     public IMetricValueRepository MetricValues { get; } = new MetricValueRepository(ctx);
+    public IValidationNotificationRepository ValidationNotifications { get; } = new ValidationNotificationRepository(ctx);
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default) => ctx.SaveChangesAsync(ct);
     public async Task BeginTransactionAsync(CancellationToken ct = default)

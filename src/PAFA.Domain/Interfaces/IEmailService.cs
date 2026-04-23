@@ -1,3 +1,5 @@
+using PAFA.Domain.Models;
+
 namespace PAFA.Domain.Interfaces;
 
 /// <summary>
@@ -12,5 +14,13 @@ public interface IEmailService
         string recipientEmail,
         string firstName,
         string temporaryPassword,
+        CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends a validation-failure notification with an HTML summary table (first 10 errors)
+    /// and a full CSV attachment containing all errors.
+    /// </summary>
+    Task SendValidationFailureAsync(
+        ValidationFailureEmailContext context,
         CancellationToken ct = default);
 }

@@ -39,7 +39,7 @@ public class IngestionFileRepository(PafaDbContext ctx)
     {
         var period = new DateOnly(year, month, 1);
         var names = await _ctx.IngestionFiles
-            .Where(f => f.Status == IngestionFileStatus.Loaded
+            .Where(f => f.Status == IngestionFileStatus.Processed
                      && _ctx.IngestionJobs
                             .Any(j => j.Id == f.IngestionJobId
                                    && j.ReportingPeriod == period))

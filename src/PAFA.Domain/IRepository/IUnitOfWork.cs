@@ -10,6 +10,7 @@ public interface IUnitOfWork : IDisposable
     IShipperRepository Shippers { get; }
     IReportRepository Reports { get; }
     IMetricValueRepository MetricValues { get; }
+    IValidationNotificationRepository ValidationNotifications { get; }
 
     Task<int> SaveChangesAsync(CancellationToken ct = default);
     Task BeginTransactionAsync(CancellationToken ct = default);

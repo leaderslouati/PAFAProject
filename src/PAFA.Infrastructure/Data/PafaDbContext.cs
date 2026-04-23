@@ -28,6 +28,7 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     public DbSet<IngestionJob> IngestionJobs => Set<IngestionJob>();
     public DbSet<IngestionFile> IngestionFiles => Set<IngestionFile>();
     public DbSet<ValidationError> ValidationErrors => Set<ValidationError>();
+    public DbSet<ValidationNotification> ValidationNotifications => Set<ValidationNotification>();
     public DbSet<MetricValue> MetricValues => Set<MetricValue>();
 
     // ── Reporting ────────────────────────────────────────────
@@ -46,6 +47,7 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
         modelBuilder.ApplyConfiguration(new ProductClassConfiguration());
         modelBuilder.ApplyConfiguration(new ShipperProductClassConfiguration());
         modelBuilder.ApplyConfiguration(new ValidationErrorConfiguration());
+        modelBuilder.ApplyConfiguration(new ValidationNotificationConfiguration());
         modelBuilder.ApplyConfiguration(new ReportConfiguration());
         modelBuilder.ApplyConfiguration(new ReportTypeConfiguration());
         modelBuilder.ApplyConfiguration(new PafaRoleConfiguration());

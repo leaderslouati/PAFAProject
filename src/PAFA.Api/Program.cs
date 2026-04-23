@@ -17,10 +17,10 @@ using PAFA.Infrastructure.Persistence;
 using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
 using PAFA.Infrastructure.Services;
+using PAFA.Infrastructure.Services.Notifications;
 using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Storage;
-using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Reports.Handlers;
 using PAFA.Reports.Writers;
 using System.Text;
@@ -122,6 +122,7 @@ builder.Services.AddScoped<IShipperRepository,       ShipperRepository>();
 builder.Services.AddScoped<IReportRepository,        ReportRepository>();
 builder.Services.AddScoped<IMetricValueRepository,   MetricValueRepository>();
 builder.Services.AddScoped<IPafaUserRepository,      PafaUserRepository>();
+builder.Services.AddScoped<IValidationNotificationRepository, ValidationNotificationRepository>();
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SERVICES
@@ -132,14 +133,24 @@ builder.Services.AddScoped<IPafaUserRepository,      PafaUserRepository>();
 builder.Services.AddScoped<PAFA.Extraction.Services.FilePipelineCache>();
 
 // ── Ingestion pipeline queue + background worker ────────────────────────────
-// La queue est Singleton : partagée entre le contrôleur HTTP (producteur)
-// et le worker background (consommateur).
 builder.Services.AddSingleton<IIngestionPipelineQueue, IngestionPipelineQueue>();
 builder.Services.AddHostedService<PAFA.Api.BackgroundServices.IngestionPipelineWorker>();
 
-// POC: logs the email. Swap for SmtpEmailService / SendGridEmailService in prod.
-builder.Services.AddScoped<IEmailService, LoggingEmailService>();
 builder.Services.AddScoped<ISharePointFileHelper, SharePointFileHelper>();
+
+// ── Email service ───────────────────────────────────────────────────────────
+// Bind notification settings (SMTP + recipient list)
+builder.Services.Configure<NotificationSettings>(
+    builder.Configuration.GetSection(NotificationSettings.SectionName));
+
+// Switch between real SMTP and logging-only based on configuration.
+// Set Notifications:UseSmtp = true in appsettings to enable real email sending.
+var useSmtp = builder.Configuration.GetValue<bool>("Notifications:UseSmtp");
+if (useSmtp)
+    builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+else
+    builder.Services.AddScoped<IEmailService, LoggingEmailService>();
+
 // ═══════════════════════════════════════════════════════════════════════
 //  POWER BI EMBEDDED — Service Principal (App Owns Data)
 // ═══════════════════════════════════════════════════════════════════════
@@ -161,18 +172,6 @@ var pbiBatchSettings = builder.Configuration
 builder.Services.AddSingleton(pbiBatchSettings);
 builder.Services.AddScoped<PowerBiDatasetRefreshService>();
 builder.Services.AddScoped<IPowerBiBatchExportService, PowerBiBatchExportService>();
-
-// ═══════════════════════════════════════════════════════════════════════
-//  POWER BI EMBEDDED — Service Principal (App Owns Data)
-// ═══════════════════════════════════════════════════════════════════════
-
-var pbiSettings = builder.Configuration
-    .GetSection(PowerBiSettings.SectionName)
-    .Get<PowerBiSettings>() ?? new PowerBiSettings();
-
-builder.Services.AddSingleton(pbiSettings);
-builder.Services.AddSingleton<PowerBiClientFactory>();
-builder.Services.AddScoped<IPowerBiExportService, PowerBiExportService>();
 
 // ═══════════════════════════════════════════════════════════════════════
 //  SHAREPOINT — Source de fichiers PARR (Microsoft Graph)

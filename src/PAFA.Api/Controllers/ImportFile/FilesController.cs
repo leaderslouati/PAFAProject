@@ -108,7 +108,7 @@ public class FilesController(IMediator mediator, IIngestionFileRepository fileRe
             step3 = new PipelineStepStatus(3, "Validation", "Pending");
         else if (validationStatus == ValidationStatus.Failed)
             step3 = new PipelineStepStatus(3, "Validation", "Failed");
-        else if (validationStatus is ValidationStatus.Passed or ValidationStatus.PassedWithWarnings)
+        else if (validationStatus is ValidationStatus.Valid or ValidationStatus.PassedWithWarnings)
             step3 = new PipelineStepStatus(3, "Validation", "Success");
         else
             step3 = new PipelineStepStatus(3, "Validation", "Pending");
@@ -118,10 +118,10 @@ public class FilesController(IMediator mediator, IIngestionFileRepository fileRe
         //   Failed   : Status = Failed ET ValidationStatus != Pending (échec à la persistence)
         //   Pending  : validation passée mais pas encore persisté
         PipelineStepStatus step4;
-        if (status == IngestionFileStatus.Loaded)
+        if (status == IngestionFileStatus.Processed)
             step4 = new PipelineStepStatus(4, "Persistence", "Success");
         else if (status == IngestionFileStatus.Failed
-              && validationStatus is ValidationStatus.Passed or ValidationStatus.PassedWithWarnings)
+              && validationStatus is ValidationStatus.Valid or ValidationStatus.PassedWithWarnings)
             step4 = new PipelineStepStatus(4, "Persistence", "Failed");
         else
             step4 = new PipelineStepStatus(4, "Persistence", "Pending");

@@ -3,8 +3,10 @@ using Microsoft.Extensions.Logging;
 using PAFA.Domain.Entities;
 using PAFA.Domain.Enums;
 using PAFA.Domain.Interfaces;
+using PAFA.Domain.Models;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
+using PAFA.Extraction.Commands.Notifications;
 using PAFA.Extraction.Services;
 using PAFA.Infrastructure.Parsing;
 using PAFA.Extraction.Validation;
@@ -24,6 +26,7 @@ public sealed class ValidateFileCommandHandler
     private readonly FilePipelineCache _cache;
     private readonly FileParserFactory _factory;
     private readonly IBlobStorageService _blob;
+    private readonly IMediator _mediator;
     private readonly ILogger<ValidateFileCommandHandler> _log;
 
     public ValidateFileCommandHandler(
@@ -31,23 +34,25 @@ public sealed class ValidateFileCommandHandler
         FilePipelineCache cache,
         FileParserFactory factory,
         IBlobStorageService blob,
+        IMediator mediator,
         ILogger<ValidateFileCommandHandler> log)
     {
-        _uow = uow;
-        _cache = cache;
-        _factory = factory;
-        _blob = blob;
-        _log = log;
+        _uow      = uow;
+        _cache    = cache;
+        _factory  = factory;
+        _blob     = blob;
+        _mediator = mediator;
+        _log      = log;
     }
 
     public async Task<ValidateFileResult> Handle(ValidateFileCommand cmd, CancellationToken ct)
     {
-        // ?? 1. Load IngestionFile ?????????????????????????????????????
+        //  1. Load IngestionFile 
         var file = await _uow.IngestionFiles.GetByIdAsync(cmd.FileId, ct);
         if (file is null)
             return new ValidateFileResult(false, cmd.FileId, false, 0, 0, "Fichier introuvable en base de données.");
 
-        // ?? 2. Retrieve parsed rows from cache. If missing, parse on-the-fly
+        //  2. Retrieve parsed rows from cache. If missing, parse on-the-fly
         // to avoid relying on the pipeline cache lifetime.
         if (!_cache.TryGetParseResult(file.Id, out var rows, out var totalRows))
         {
@@ -98,7 +103,7 @@ public sealed class ValidateFileCommandHandler
         var validator = new ImportValidationService(knownCodes);
         var validation = validator.Validate(fakeParseResult, file.FileName, isAnonymised: false);
 
-        // ?? 4. Persist ValidationError records ????????????????????????
+        //  4. Persist ValidationError records 
         if (validation.Findings.Count != 0)
         {
             var dbErrors = validation.Findings.Select(f => new ValidationError
@@ -122,7 +127,7 @@ public sealed class ValidateFileCommandHandler
             ? ValidationStatus.Failed
             : validation.Findings.Any(f => f.Severity == ValidationSeverity.Warning)
                 ? ValidationStatus.PassedWithWarnings
-                : ValidationStatus.Passed;
+                : ValidationStatus.Valid;
 
         _uow.IngestionFiles.Update(file);
         await _uow.SaveChangesAsync(ct);
@@ -131,6 +136,35 @@ public sealed class ValidateFileCommandHandler
             "[VALIDATE] OK — {File} | Blocking={Blocking} | Valid={Valid} | Rejected={Rejected}",
             file.FileName, validation.HasBlockingErrors,
             validation.ValidRowCount, validation.InvalidRowCount);
+
+        //  6. Send failure notification when blocking errors are detected
+        if (validation.HasBlockingErrors)
+        {
+            // Load the parent job to obtain the reporting period label
+            var job = await _uow.IngestionJobs.GetByIdAsync(file.IngestionJobId, ct);
+            var periodLabel = job is not null
+                ? job.ReportingPeriod.ToString("yyyy-MM")
+                : "Unknown";
+
+            var errorItems = validation.Findings
+                .Select(f => new ValidationErrorItem(
+                    f.RowNumber > 0 ? f.RowNumber : null,
+                    f.FieldName,
+                    f.RuleId,
+                    f.Severity.ToString().ToUpperInvariant(),
+                    f.ErrorMessage,
+                    f.FieldValue))
+                .ToList();
+
+            var notifCmd = new SendValidationFailureNotificationCommand(
+                file.Id,
+                file.FileName,
+                periodLabel,
+                file.SourceSystem,
+                errorItems);
+
+            await _mediator.Send(notifCmd, ct);
+        }
 
         return new ValidateFileResult(
             Success: true,

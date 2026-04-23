@@ -7,12 +7,12 @@ public enum IngestionJobStatus
 
 public enum IngestionFileStatus
 {
-    Downloaded, Validating, Valid, Invalid, Loaded, Failed
+    Downloaded, Validating, Valid, Invalid, Processed, Failed
 }
 
 public enum ValidationStatus
 {
-    Pending, Passed, PassedWithWarnings, Failed
+    Pending, Valid, PassedWithWarnings, Failed
 }
 
 public enum FileType
