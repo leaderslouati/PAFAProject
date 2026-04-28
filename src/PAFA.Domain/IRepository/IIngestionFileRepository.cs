@@ -34,4 +34,10 @@ public interface IIngestionFileRepository : IBaseRepository<IngestionFile>
     /// on resume/retry.
     /// </summary>
     Task<HashSet<string>> GetAlreadyLoadedFileNamesAsync(int year, int month, CancellationToken ct = default);
+
+    /// <summary>
+    /// Returns file names with their last known remote modification dates for a given period.
+    /// Used for AC5 change detection — if the remote LastModified differs, the file needs reprocessing.
+    /// </summary>
+    Task<Dictionary<string, DateTime>> GetLoadedFileModificationDatesAsync(int year, int month, CancellationToken ct = default);
 }

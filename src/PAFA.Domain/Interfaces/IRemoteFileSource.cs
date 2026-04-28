@@ -31,6 +31,12 @@ public interface IRemoteFileSource
 
     /// <summary>Test de connectivité.</summary>
     Task<bool> TestConnectionAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Test de connectivité with detailed error classification (AC8).
+    /// Distinguishes authentication failures from network/other errors.
+    /// </summary>
+    Task<PAFA.Domain.Models.ConnectionTestResult> TestConnectionDetailedAsync(CancellationToken ct = default);
 }
 
 /// <summary>

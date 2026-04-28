@@ -47,4 +47,23 @@ public class IngestionFileRepository(PafaDbContext ctx)
             .ToListAsync(ct);
         return new HashSet<string>(names, StringComparer.OrdinalIgnoreCase);
     }
+
+    /// <inheritdoc />
+    public async Task<Dictionary<string, DateTime>> GetLoadedFileModificationDatesAsync(
+        int year, int month, CancellationToken ct = default)
+    {
+        var period = new DateOnly(year, month, 1);
+        var entries = await _ctx.IngestionFiles
+            .Where(f => f.Status == IngestionFileStatus.Processed
+                     && f.LastModifiedRemote != null
+                     && _ctx.IngestionJobs
+                            .Any(j => j.Id == f.IngestionJobId
+                                   && j.ReportingPeriod == period))
+            .Select(f => new { f.FileName, f.LastModifiedRemote })
+            .ToListAsync(ct);
+        return entries.ToDictionary(
+            e => e.FileName,
+            e => e.LastModifiedRemote!.Value,
+            StringComparer.OrdinalIgnoreCase);
+    }
 }

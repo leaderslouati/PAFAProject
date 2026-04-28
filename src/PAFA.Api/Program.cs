@@ -147,7 +147,7 @@ builder.Services.Configure<NotificationSettings>(
 // Set Notifications:UseSmtp = true in appsettings to enable real email sending.
 var useSmtp = builder.Configuration.GetValue<bool>("Notifications:UseSmtp");
 if (useSmtp)
-    builder.Services.AddScoped<IEmailService, SmtpEmailService>();
+    builder.Services.AddScoped<IEmailService, SmtpEmailService>(); // ← active in Dev
 else
     builder.Services.AddScoped<IEmailService, LoggingEmailService>();
 

@@ -138,7 +138,7 @@ public sealed class ValidateFileCommandHandler
             validation.ValidRowCount, validation.InvalidRowCount);
 
         //  6. Send failure notification when blocking errors are detected
-        if (validation.HasBlockingErrors)
+        if (validation.HasBlockingErrors && validation.Findings.Count >= 10)
         {
             // Load the parent job to obtain the reporting period label
             var job = await _uow.IngestionJobs.GetByIdAsync(file.IngestionJobId, ct);

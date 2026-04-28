@@ -1,12 +1,14 @@
 ﻿using MediatR;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using PAFA.Domain.Enums;
 using PAFA.Domain.Interfaces;
 using PAFA.Domain.IRepository;
+using PAFA.Domain.Models;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Import;
 using PAFA.Extraction.Validations;
-using PAFA.Extraction.Helpers; 
+using PAFA.Extraction.Helpers;
 
 namespace PAFA.Extraction.Commands.SharePoint;
 
@@ -20,7 +22,9 @@ public sealed class DownloadParrFilesCommandHandler
     private readonly IFileSourceSettings _settings;
     private readonly IIngestionJobRepository _jobRepo;
     private readonly ILogger<DownloadParrFilesCommandHandler> _log;
-    private readonly ISharePointFileHelper _helper; 
+    private readonly ISharePointFileHelper _helper;
+    private readonly IEmailService _emailService;
+    private readonly SharePointRetrySettings _retrySettings;
 
     public DownloadParrFilesCommandHandler(
         IRemoteFileSource fileSource,
@@ -30,7 +34,9 @@ public sealed class DownloadParrFilesCommandHandler
         IFileSourceSettings settings,
         IIngestionJobRepository jobRepo,
         ILogger<DownloadParrFilesCommandHandler> log,
-        ISharePointFileHelper helper)
+        ISharePointFileHelper helper,
+        IEmailService emailService,
+        IOptions<SharePointRetrySettings> retrySettings)
     {
         _fileSource = fileSource;
         _blob = blob;
@@ -40,6 +46,8 @@ public sealed class DownloadParrFilesCommandHandler
         _jobRepo = jobRepo;
         _log = log;
         _helper = helper;
+        _emailService = emailService;
+        _retrySettings = retrySettings.Value;
     }
 
     // ── Fenêtre cron : jours 18–21 du mois ───────────────────────────────
@@ -77,6 +85,10 @@ public sealed class DownloadParrFilesCommandHandler
         var alreadyLoadedFiles = await _uow.IngestionFiles
             .GetAlreadyLoadedFileNamesAsync(periodYear, periodMonth, ct);
 
+        // AC5: Load stored modification dates for change detection
+        var storedModDates = await _uow.IngestionFiles
+            .GetLoadedFileModificationDatesAsync(periodYear, periodMonth, ct);
+
         if (alreadyLoadedFiles.Count > 0)
             _log.LogInformation(
                 "[CRON] Reprise — {Count} fichier(s) déjà chargé(s) seront ignorés : {Files}",
@@ -111,22 +123,42 @@ public sealed class DownloadParrFilesCommandHandler
         var errors = new List<FileError>();
         var skipped = new List<SkippedFileRecord>();
 
-        // ── 1. Test connexion ─────────────────────────────────────────────
-        if (!await _fileSource.TestConnectionAsync(ct))
+        // ── 1. Test connexion with retry (AC8 + AC9) ─────────────────────
+        var connectionResult = await TestConnectionWithRetryAsync(ct);
+        if (!connectionResult.IsConnected)
         {
-            _log.LogError("Connexion SharePoint impossible");
+            _log.LogError("Connexion SharePoint impossible après {Retries} tentatives: [{ErrorType}] {Error}",
+                _retrySettings.MaxRetries, connectionResult.ErrorType, connectionResult.ErrorMessage);
+
+            // AC10: Send failure notification after all retries exhausted
+            await SendFailureNotificationAsync(periodYear, periodMonth, cmd.TriggerSource,
+                $"SharePoint connection failed: [{connectionResult.ErrorType}] {connectionResult.ErrorMessage}", ct);
+
             return new DownloadParrFilesResult(false, 0, 0, 0, imported,
-                [new("FileSource", "Connection failed")], skipped,
+                [new("FileSource", $"Connection failed: [{connectionResult.ErrorType}] {connectionResult.ErrorMessage}")], skipped,
                 cmd.TriggerSource, cmd.TriggerMode.ToString());
         }
 
-        // ── 2. Lister les fichiers ────────────────────────────────────────
-        var files = await _fileSource.ListFilesAsync(inboundPath, _settings.FilePattern, ct);
+        // ── 2. Lister les fichiers with retry (AC9) ──────────────────────
+        IReadOnlyList<RemoteFileEntry>? files = null;
+        var listError = await ExecuteWithRetryAsync("ListFiles", async () =>
+        {
+            files = await _fileSource.ListFilesAsync(inboundPath, _settings.FilePattern, ct);
+        }, ct);
+
+        if (listError != null)
+        {
+            await SendFailureNotificationAsync(periodYear, periodMonth, cmd.TriggerSource,
+                $"Failed to list SharePoint files: {listError}", ct);
+            return new DownloadParrFilesResult(false, 0, 0, 0, imported,
+                [new("FileSource", $"List files failed: {listError}")], skipped,
+                cmd.TriggerSource, cmd.TriggerMode.ToString());
+        }
 
         if (cmd.FileNameFilter?.Any() == true)
-            files = files.Where(f => cmd.FileNameFilter.Contains(f.FileName)).ToList();
+            files = files!.Where(f => cmd.FileNameFilter.Contains(f.FileName)).ToList();
 
-        _log.LogInformation("{Count} fichier(s) trouvé(s) dans {Path}", files.Count, inboundPath);
+        _log.LogInformation("{Count} fichier(s) trouvé(s) dans {Path}", files!.Count, inboundPath);
 
         if (!files.Any())
         {
@@ -140,12 +172,24 @@ public sealed class DownloadParrFilesCommandHandler
         {
             if (ct.IsCancellationRequested) break;
 
-            // ── Reprise : ignorer les fichiers déjà chargés ───────────────
+            // ── Reprise : ignorer les fichiers déjà chargés (sauf si modifiés — AC5) ──
             if (alreadyLoadedFiles.Contains(file.FileName))
             {
-                _log.LogInformation("[CRON] Skip (déjà chargé) : {File}", file.FileName);
-                imported.Add(file.FileName);
-                continue;
+                // AC5: Check if the file has been modified since last processing
+                if (storedModDates.TryGetValue(file.FileName, out var storedDate)
+                    && Math.Abs((file.LastModified - storedDate).TotalSeconds) > 1)
+                {
+                    _log.LogInformation(
+                        "[AC5] File modified since last processing: {File} | Stored: {Stored:u} | Remote: {Remote:u}",
+                        file.FileName, storedDate, file.LastModified);
+                    // Fall through to reprocess
+                }
+                else
+                {
+                    _log.LogInformation("[CRON] Skip (déjà chargé) : {File}", file.FileName);
+                    imported.Add(file.FileName);
+                    continue;
+                }
             }
 
             // FOLD-001
@@ -271,5 +315,104 @@ public sealed class DownloadParrFilesCommandHandler
             SkippedFiles: skipped,
             TriggerSource: cmd.TriggerSource,
             TriggerMode: cmd.TriggerMode.ToString());
+    }
+
+    // ── AC9: Retry mechanism with exponential backoff ─────────────────
+
+    private async Task<ConnectionTestResult> TestConnectionWithRetryAsync(CancellationToken ct)
+    {
+        for (int attempt = 0; attempt <= _retrySettings.MaxRetries; attempt++)
+        {
+            var result = await _fileSource.TestConnectionDetailedAsync(ct);
+            if (result.IsConnected)
+                return result;
+
+            // Don't retry on authentication failures — they won't self-resolve
+            if (result.ErrorType == ConnectionErrorType.Authentication
+                || result.ErrorType == ConnectionErrorType.Forbidden)
+            {
+                _log.LogError("[RETRY] Authentication/Forbidden error — no retry. [{Type}] {Msg}",
+                    result.ErrorType, result.ErrorMessage);
+                return result;
+            }
+
+            if (attempt < _retrySettings.MaxRetries)
+            {
+                var delayMinutes = attempt < _retrySettings.DelayMinutes.Length
+                    ? _retrySettings.DelayMinutes[attempt]
+                    : _retrySettings.DelayMinutes[^1];
+
+                _log.LogWarning(
+                    "[RETRY] Connection attempt {Attempt}/{Max} failed. Retrying in {Delay} min...",
+                    attempt + 1, _retrySettings.MaxRetries, delayMinutes);
+
+                await Task.Delay(TimeSpan.FromMinutes(delayMinutes), ct);
+            }
+            else
+            {
+                return result;
+            }
+        }
+
+        return ConnectionTestResult.Unknown("All retry attempts exhausted.");
+    }
+
+    private async Task<string?> ExecuteWithRetryAsync(string operationName, Func<Task> action, CancellationToken ct)
+    {
+        for (int attempt = 0; attempt <= _retrySettings.MaxRetries; attempt++)
+        {
+            try
+            {
+                await action();
+                return null; // success
+            }
+            catch (Exception ex) when (attempt < _retrySettings.MaxRetries)
+            {
+                var delayMinutes = attempt < _retrySettings.DelayMinutes.Length
+                    ? _retrySettings.DelayMinutes[attempt]
+                    : _retrySettings.DelayMinutes[^1];
+
+                _log.LogWarning(ex,
+                    "[RETRY] {Operation} attempt {Attempt}/{Max} failed. Retrying in {Delay} min...",
+                    operationName, attempt + 1, _retrySettings.MaxRetries, delayMinutes);
+
+                await Task.Delay(TimeSpan.FromMinutes(delayMinutes), ct);
+            }
+            catch (Exception ex)
+            {
+                _log.LogError(ex, "[RETRY] {Operation} failed after {Max} attempts.", operationName, _retrySettings.MaxRetries);
+                return ex.Message;
+            }
+        }
+
+        return "All retry attempts exhausted.";
+    }
+
+    // ── AC10: Failure notification after all retries exhausted ────────
+
+    private async Task SendFailureNotificationAsync(
+        int year, int month, string triggerSource, string errorMessage, CancellationToken ct)
+    {
+        try
+        {
+            var context = new IngestionFailureEmailContext(
+                Year: year,
+                Month: month,
+                TriggerSource: triggerSource,
+                ErrorMessage: errorMessage,
+                RetryAttempts: _retrySettings.MaxRetries,
+                FailedAtUtc: DateTime.UtcNow,
+                Recipients: _retrySettings.FailureNotificationRecipients);
+
+            await _emailService.SendIngestionFailureAsync(context, ct);
+
+            _log.LogInformation(
+                "[AC10] Failure notification sent to {Count} recipient(s) for period {Year}-{Month:D2}.",
+                context.Recipients.Count, year, month);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "[AC10] Failed to send failure notification for period {Year}-{Month:D2}.", year, month);
+        }
     }
 }

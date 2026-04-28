@@ -38,6 +38,9 @@ public class IngestionFile : BaseEntity
     public DateTime? DownloadedAt { get; set; }
     public DateTime? ProcessedAt { get; set; }
 
+    /// <summary>Last modified date from the remote source (SharePoint). Used for AC5 change detection.</summary>
+    public DateTime? LastModifiedRemote { get; set; }
+
     // ── Navigation ─────────────────────────────────────────────────
     public IngestionJob IngestionJob { get; set; } = null!;
 

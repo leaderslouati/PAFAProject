@@ -25,6 +25,7 @@ public class IngestionFileConfiguration : IEntityTypeConfiguration<IngestionFile
             .IsRequired(false)
             .HasDefaultValueSql("decode('', 'hex')");
         b.HasIndex(x => x.FileHash).HasDatabaseName("ix_file_hash");
+        b.Property(x => x.LastModifiedRemote);
         b.HasMany(x => x.ValidationErrors).WithOne(x => x.IngestionFile)
             .HasForeignKey(x => x.IngestionFileId).OnDelete(DeleteBehavior.Cascade);
         b.HasMany(x => x.MetricValues).WithOne(x => x.IngestionFile)

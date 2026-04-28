@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Microsoft.Graph;
 using Microsoft.Graph.Models;
 using Microsoft.Graph.Models.ODataErrors;
+using PAFA.Domain.Models;
 
 namespace PAFA.Infrastructure.SharePoint;
 
@@ -185,6 +186,12 @@ public sealed class SharePointFileSource : IRemoteFileSource
 
     public async Task<bool> TestConnectionAsync(CancellationToken ct = default)
     {
+        var result = await TestConnectionDetailedAsync(ct);
+        return result.IsConnected;
+    }
+
+    public async Task<ConnectionTestResult> TestConnectionDetailedAsync(CancellationToken ct = default)
+    {
         try
         {
             var graph = BuildClient();
@@ -193,13 +200,38 @@ public sealed class SharePointFileSource : IRemoteFileSource
 
             _log.LogInformation("SharePoint connexion OK — Site: {Name} ({Url})",
                 site?.DisplayName, site?.WebUrl);
-            return site != null;
+            return site != null
+                ? ConnectionTestResult.Success()
+                : ConnectionTestResult.Unknown("Site returned null.");
+        }
+        catch (AuthenticationFailedException ex)
+        {
+            _log.LogError(ex, "SharePoint authentication failed — credentials invalid or expired. TenantId: {TenantId}", _cfg.TenantId);
+            return ConnectionTestResult.AuthenticationFailure(
+                $"Authentication failed: {ex.Message}. Check ClientId/ClientSecret/TenantId.");
+        }
+        catch (ODataError ex) when (ex.ResponseStatusCode == 401)
+        {
+            _log.LogError(ex, "SharePoint 401 Unauthorized — TenantId: {TenantId}, SiteId: {SiteId}", _cfg.TenantId, _cfg.SiteId);
+            return ConnectionTestResult.AuthenticationFailure(
+                $"HTTP 401 Unauthorized: {ex.Message}");
+        }
+        catch (ODataError ex) when (ex.ResponseStatusCode == 403)
+        {
+            _log.LogError(ex, "SharePoint 403 Forbidden — insufficient permissions. SiteId: {SiteId}", _cfg.SiteId);
+            return ConnectionTestResult.Forbidden(
+                $"HTTP 403 Forbidden: insufficient permissions for site '{_cfg.SiteId}'.");
+        }
+        catch (HttpRequestException ex)
+        {
+            _log.LogError(ex, "SharePoint network error — TenantId: {TenantId}, SiteId: {SiteId}", _cfg.TenantId, _cfg.SiteId);
+            return ConnectionTestResult.NetworkError($"Network error: {ex.Message}");
         }
         catch (Exception ex)
         {
             _log.LogError(ex, "SharePoint connexion échouée — TenantId: {TenantId}, SiteId: {SiteId}",
                 _cfg.TenantId, _cfg.SiteId);
-            return false;
+            return ConnectionTestResult.Unknown(ex.Message);
         }
     }
 

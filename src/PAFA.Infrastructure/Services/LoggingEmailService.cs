@@ -42,5 +42,24 @@ public class LoggingEmailService(ILogger<LoggingEmailService> log) : IEmailServi
 
         return Task.CompletedTask;
     }
+
+    public Task SendIngestionFailureAsync(
+        IngestionFailureEmailContext context,
+        CancellationToken ct = default)
+    {
+        log.LogError(
+            "[EMAIL-LOG] INGESTION FAILURE NOTIFICATION ? {Recipients} | Period: {Year}-{Month:D2} | Trigger: {Trigger} | Retries: {Retries} | Error: {Error} | FailedAt: {FailedAt:u}",
+            string.Join(";", context.Recipients),
+            context.Year,
+            context.Month,
+            context.TriggerSource,
+            context.RetryAttempts,
+            context.ErrorMessage,
+            context.FailedAtUtc);
+
+        return Task.CompletedTask;
+    }
 }
+
+
 

@@ -23,4 +23,12 @@ public interface IEmailService
     Task SendValidationFailureAsync(
         ValidationFailureEmailContext context,
         CancellationToken ct = default);
+
+    /// <summary>
+    /// Sends an ingestion failure notification after all retry attempts have been exhausted (AC10).
+    /// Alerts relevant users so they can investigate and take manual action.
+    /// </summary>
+    Task SendIngestionFailureAsync(
+        IngestionFailureEmailContext context,
+        CancellationToken ct = default);
 }
