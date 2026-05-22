@@ -17,6 +17,7 @@ public class IngestionJobConfiguration : IEntityTypeConfiguration<IngestionJob>
         b.Property(x => x.Status).HasConversion<string>().HasMaxLength(30);
         b.Property(x => x.TriggeredBy).HasConversion<string>().HasMaxLength(20);
         b.Property(x => x.ErrorSummary).HasMaxLength(2000);
+        b.Property(x => x.CorrelationId).IsRequired(false);
         b.Property(x => x.CreatedBy).HasMaxLength(100);
         b.Property(x => x.UpdatedBy).HasMaxLength(100);
         b.Property(x => x.RowVersion)

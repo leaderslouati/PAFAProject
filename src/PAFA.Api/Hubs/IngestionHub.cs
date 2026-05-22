@@ -78,3 +78,40 @@ public sealed record PipelineFinishedPayload(
     long TotalDurationMs
 );
 
+/// <summary>
+/// Emis par POST /api/sharepoint/start juste après la découverte des fichiers SharePoint
+/// non encore traités et leur transfert dans MinIO.
+/// Le front utilise cet événement pour afficher la liste "fichiers en attente" (Step 1).
+/// </summary>
+public sealed record PendingFilesDiscoveredPayload(
+    int Year,
+    int Month,
+    int TotalPending,
+    IReadOnlyList<PendingFileInfo> Files
+);
+
+/// <summary>Représente un fichier en attente de traitement (Step 1 — SharePoint ? MinIO).</summary>
+public sealed record PendingFileInfo(
+    Guid FileId,
+    string FileName,
+    long SizeBytes,
+    /// <summary>"Pending" — fichier dans MinIO, en attente de parse+validate+persist.</summary>
+    string Status
+);
+
+/// <summary>
+/// Ligne de résultat par fichier pour Step 2 (ParseAndValidate fusionné).
+/// Indique si le fichier ira dans le dossier "processed" ou "failed" de MinIO.
+/// </summary>
+public sealed record FileProcessingResultRow(
+    Guid FileId,
+    string FileName,
+    /// <summary>"Processed" si valide, "Failed" si erreurs bloquantes ou parse échoué.</summary>
+    string FileStatus,
+    int RowsRead,
+    int RowsValid,
+    int RowsRejected,
+    bool HasBlockingErrors,
+    string? ErrorMessage
+);
+

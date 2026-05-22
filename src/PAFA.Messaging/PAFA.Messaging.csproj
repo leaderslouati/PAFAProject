@@ -6,6 +6,15 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <!-- No external dependencies — pure event contracts (POCOs) -->
+  <!-- Event contracts (POCOs) + Azure Service Bus sending -->
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.18.4" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="9.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Options" Version="9.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PAFA.Domain\PAFA.Domain.csproj" />
+  </ItemGroup>
 
 </Project>

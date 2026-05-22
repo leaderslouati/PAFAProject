@@ -32,11 +32,17 @@ public interface IRemoteFileSource
     /// <summary>Test de connectivité.</summary>
     Task<bool> TestConnectionAsync(CancellationToken ct = default);
 
-    /// <summary>
-    /// Test de connectivité with detailed error classification (AC8).
+    /// <summary>Test de connectivité with detailed error classification (AC8).
     /// Distinguishes authentication failures from network/other errors.
     /// </summary>
     Task<PAFA.Domain.Models.ConnectionTestResult> TestConnectionDetailedAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Patches a SharePoint list-item column to update the processing status of a file.
+    /// Used to lock files against duplicate processing (status: Processing)
+    /// or record the final outcome (Processed / Quarantined).
+    /// </summary>
+    Task PatchStatusAsync(string remotePath, string status, CancellationToken ct = default);
 }
 
 /// <summary>

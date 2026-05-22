@@ -200,6 +200,9 @@ namespace PAFA.Infrastructure.Migrations
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
+                    b.Property<DateTime?>("LastModifiedRemote")
+                        .HasColumnType("timestamp with time zone");
+
                     b.Property<DateTime?>("ProcessedAt")
                         .HasColumnType("timestamp with time zone");
 
@@ -259,6 +262,9 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<DateTime?>("CompletedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -646,7 +652,7 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<int?>("CheckReadCountNotCompleted")
                         .HasColumnType("integer")
-                        .HasComment("Nb check reads non complétés. >= 0.");
+                        .HasComment("Nb check reads non compl�t�s. >= 0.");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("timestamp with time zone");
@@ -657,14 +663,14 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<decimal?>("EstimatedPct")
                         .HasColumnType("numeric(8,4)")
-                        .HasComment("% lectures estimées (0-100). Source: MetricKey='EstimatedPct'.");
+                        .HasComment("% lectures estim�es (0-100). Source: MetricKey='EstimatedPct'.");
 
                     b.Property<bool>("IsDeleted")
                         .HasColumnType("boolean");
 
                     b.Property<int?>("NoMeterCount")
                         .HasColumnType("integer")
-                        .HasComment("Nb SP sans meter enregistré. >= 0.");
+                        .HasComment("Nb SP sans meter enregistr�. >= 0.");
 
                     b.Property<decimal?>("NoMeterPct")
                         .HasColumnType("numeric(8,4)")
@@ -755,7 +761,7 @@ namespace PAFA.Infrastructure.Migrations
 
                     b.Property<DateTime?>("ObservationsUpdatedAt")
                         .HasColumnType("timestamp with time zone")
-                        .HasComment("Horodatage UTC de la dernière mise à jour des observations.");
+                        .HasComment("Horodatage UTC de la derni�re mise � jour des observations.");
 
                     b.Property<DateTime?>("PublishedAt")
                         .HasColumnType("timestamp with time zone");

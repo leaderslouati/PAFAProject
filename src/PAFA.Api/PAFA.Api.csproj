@@ -20,6 +20,8 @@
   <ItemGroup>
     <ProjectReference Include="..\PAFA.Extraction\PAFA.Extraction.csproj" />
     <ProjectReference Include="..\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
+    <ProjectReference Include="..\PAFA.Messaging\PAFA.Messaging.csproj" />
+    <ProjectReference Include="..\PAFA.Notifications\PAFA.Notifications.csproj" />
     <ProjectReference Include="..\PAFA.Reports\PAFA.Reports.csproj" />
   </ItemGroup>
 

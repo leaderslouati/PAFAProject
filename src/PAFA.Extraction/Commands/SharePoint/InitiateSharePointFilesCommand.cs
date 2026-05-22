@@ -3,25 +3,27 @@ using MediatR;
 namespace PAFA.Extraction.Commands.SharePoint;
 
 /// <summary>
-/// Commande déclenchée HORS fenêtre cron (jours 18–21), via API manuelle.
+/// Commande déclenchée via POST /api/sharepoint/start.
 ///
-/// Responsabilité : identifier les fichiers SharePoint non encore traités avec succès
-/// pour la période demandée, les télécharger, les stocker dans MinIO et créer les
-/// enregistrements Job + IngestionFile en base. 
+/// Year et Month sont optionnels : si absents, le mois et l'année courants sont utilisés.
 ///
-/// Après cet appel, le client enchaîne les étapes existantes :
-///   POST /api/files/{fileId}/parse
-///   POST /api/files/{fileId}/validate
-///   POST /api/files/{fileId}/persist
+/// Flux de découverte des fichiers :
+///   1. Lister /{BaseInboundPath}/{YYYY}/{MM}/   ? fichiers neufs à traiter
+///   2. Si ReprocessFailed=true, lister /processed/{YYYY}/{MM}/ et /failed/{YYYY}/{MM}/
+///      ? déplacer chaque fichier trouvé vers /inbound avant de le traiter
 /// </summary>
 public sealed record InitiateSharePointFilesCommand(
-    int Year,
-    int Month,
+    /// <summary>Année de la période. Si null, utilise l'année courante.</summary>
+    int? Year = null,
+    /// <summary>Mois de la période (1-12). Si null, utilise le mois courant.</summary>
+    int? Month = null,
+    /// <summary>Filtre optionnel sur les noms de fichiers.</summary>
+    List<string>? FileNameFilter = null,
     /// <summary>
-    /// Filtre optionnel sur les noms de fichiers.
-    /// Si null ou vide, tous les fichiers pending sont traités.
+    /// Si true, les fichiers présents dans /processed/{YYYY}/{MM} ou /failed/{YYYY}/{MM}
+    /// sont déplacés vers /inbound et retraités. Défaut : false.
     /// </summary>
-    List<string>? FileNameFilter = null
+    bool ReprocessFailed = false
 ) : IRequest<InitiateSharePointFilesResult>;
 
 // ?? Result ????????????????????????????????????????????????????????????????????
@@ -30,9 +32,9 @@ public sealed record InitiateSharePointFilesResult(
     bool Success,
     int Year,
     int Month,
-    /// <summary>Fichiers mis en attente de traitement — un enregistrement par fichier prêt au pipeline.</summary>
+    /// <summary>Fichiers mis en attente de traitement.</summary>
     IReadOnlyList<PendingFileEntry> PendingFiles,
-    /// <summary>Fichiers détectés sur SharePoint mais ignorés (déjà traités ou erreur de validation du nom).</summary>
+    /// <summary>Fichiers ignorés (déjà traités ou erreur de validation du nom).</summary>
     IReadOnlyList<SkippedFileRecord> SkippedFiles,
     string? ErrorMessage = null
 );

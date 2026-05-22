@@ -7,10 +7,11 @@
 		<ProduceReferenceAssembly>false</ProduceReferenceAssembly>
 	</PropertyGroup>
 
-	<ItemGroup>
-		<ProjectReference Include="..\PAFA.Domain\PAFA.Domain.csproj" />
-		<ProjectReference Include="..\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
-	</ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\PAFA.Domain\PAFA.Domain.csproj" />
+    <ProjectReference Include="..\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
+    <ProjectReference Include="..\PAFA.Notifications\PAFA.Notifications.csproj" />
+  </ItemGroup>
 
 	<ItemGroup>
 		<PackageReference Include="FluentValidation" Version="11.11.0" />

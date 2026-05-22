@@ -236,6 +236,64 @@ public sealed class SharePointFileSource : IRemoteFileSource
     }
 
     // ───────────────────────────────────────────────────────────────
+    //  5. Patch SharePoint processing status
+    // ───────────────────────────────────────────────────────────────
+
+    public async Task PatchStatusAsync(string remotePath, string status, CancellationToken ct = default)
+    {
+        try
+        {
+            var graph   = BuildClient();
+            var driveId = await ResolveDriveIdAsync(graph, ct);
+
+            // Fetch the drive item and request SharePoint list identifiers
+            var item = await graph.Drives[driveId]
+                .Root
+                .ItemWithPath(remotePath)
+                .GetAsync(q => q.QueryParameters.Select = ["id", "sharepointIds"], ct);
+
+            var listId     = item?.SharepointIds?.ListId;
+            var listItemId = item?.SharepointIds?.ListItemId;
+
+            if (listId is null || listItemId is null)
+            {
+                _log.LogWarning(
+                    "Cannot patch SharePoint status for {Path} — SharePoint list IDs not resolved",
+                    remotePath);
+                return;
+            }
+
+            await graph.Sites[_cfg.SiteId]
+                .Lists[listId]
+                .Items[listItemId]
+                .Fields
+                .PatchAsync(
+                    new FieldValueSet
+                    {
+                        AdditionalData = new Dictionary<string, object>
+                        {
+                            ["ProcessingStatus"] = status
+                        }
+                    },
+                    cancellationToken: ct);
+
+            _log.LogInformation(
+                "SharePoint status patched: {Path} \u2192 {Status}", remotePath, status);
+        }
+        catch (ODataError ex) when (ex.ResponseStatusCode == 404)
+        {
+            _log.LogWarning(
+                "SharePoint PATCH skipped \u2014 item not found at {Path}: {Error}",
+                remotePath, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            _log.LogError(ex, "SharePoint status patch failed for {Path}", remotePath);
+            throw;
+        }
+    }
+
+    // ───────────────────────────────────────────────────────────────
     //  Helpers
     // ───────────────────────────────────────────────────────────────
 

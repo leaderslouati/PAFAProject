@@ -52,3 +52,21 @@ public enum ExportFormat
 {
     Csv, Excel, Pdf, PowerBiEmbedded
 }
+
+/// <summary>Outcome of a single file during the Import step (Step 1).</summary>
+public enum ImportStatus
+{
+    Imported, SkippedInvalidName, SkippedInvalidFolder
+}
+
+/// <summary>Overall status of a pipeline execution tracked by PipelineBackgroundService.</summary>
+public enum PipelineStatus
+{
+    Pending, Running, Success, Error
+}
+
+/// <summary>Status of a single step inside a pipeline execution.</summary>
+public enum StepStatus
+{
+    Pending, Running, Success, Error, Skipped
+}

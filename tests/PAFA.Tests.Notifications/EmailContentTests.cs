@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using PAFA.Domain.Models;
-using PAFA.Infrastructure.Services.Notifications;
+using PAFA.Notifications.Builders;
 
 namespace PAFA.Tests.Notifications;
 
@@ -60,7 +60,7 @@ public class EmailContentTests
             AllErrors:       errors);
     }
 
-    // Helper — build HTML via SmtpEmailService reflection-free by using
+    // Helper ï¿½ build HTML via SmtpEmailService reflection-free by using
     // EmailContentBuilder (the inner static logic extracted for testability).
     private static string GetHtml(ValidationFailureEmailContext ctx)
         => EmailContentBuilder.BuildHtmlBody(ctx);
@@ -102,7 +102,7 @@ public class EmailContentTests
     public void HtmlBody_WithFiveErrors_ContainsFiveTableRows()
     {
         var html = GetHtml(BuildContext(errorCount: 5));
-        // Each data row has <tr> — count occurrences beyond the header rows
+        // Each data row has <tr> ï¿½ count occurrences beyond the header rows
         var trCount = CountOccurrences(html, "<tr>");
         // 1 header row + 5 data rows + 2 info table rows (file/period/source/total = 4)
         Assert.True(trCount >= 5, $"Expected at least 5 <tr> elements, found {trCount}");
@@ -217,7 +217,7 @@ public class EmailContentTests
     public void Csv_IsUtf8Encoded()
     {
         var bytes = EmailContentBuilder.BuildCsvBytes(BuildContext(errorCount: 2).AllErrors);
-        // UTF-8 BOM is optional — we just check the content round-trips cleanly
+        // UTF-8 BOM is optional ï¿½ we just check the content round-trips cleanly
         var text = System.Text.Encoding.UTF8.GetString(bytes);
         Assert.Contains("RowNumber", text);
     }

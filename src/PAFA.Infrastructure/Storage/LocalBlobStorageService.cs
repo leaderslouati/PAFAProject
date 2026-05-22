@@ -83,4 +83,16 @@ public sealed class LocalBlobStorageService : IBlobStorageService
         var ok = Directory.Exists(_basePath);
         return Task.FromResult(ok);
     }
+
+    public Task<string> GenerateReadUrlAsync(
+        string blobPath,
+        TimeSpan? expiry = null,
+        CancellationToken ct = default)
+    {
+        // In local dev there is no SAS concept — return the local folder path.
+        var dir = Path.Combine(
+            _basePath,
+            (Path.GetDirectoryName(blobPath) ?? blobPath).Replace('/', Path.DirectorySeparatorChar));
+        return Task.FromResult(dir);
+    }
 }

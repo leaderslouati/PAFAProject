@@ -2,12 +2,12 @@ namespace PAFA.Domain.Interfaces;
 
 /// <summary>
 /// Contrat pour le stockage de fichiers bruts (Azure Blob en prod, MinIO/Local en POC).
-/// Défini dans Domain — aucune dépendance infra.
+/// Dï¿½fini dans Domain ï¿½ aucune dï¿½pendance infra.
 /// </summary>
 public interface IBlobStorageService
 {
     /// <summary>
-    /// Upload un fichier brut. Retourne le chemin/URI du blob stocké.
+    /// Upload un fichier brut. Retourne le chemin/URI du blob stockï¿½.
     /// </summary>
     Task<string> UploadAsync(
         string fileName,
@@ -18,19 +18,23 @@ public interface IBlobStorageService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Télécharge un fichier depuis le stockage sous forme de flux (Stream)
-    /// pour éviter la surcharge mémoire des gros fichiers.
+    /// Tï¿½lï¿½charge un fichier depuis le stockage sous forme de flux (Stream)
+    /// pour ï¿½viter la surcharge mï¿½moire des gros fichiers.
     /// </summary>
     Task<Stream> DownloadStreamAsync(string blobPath, CancellationToken ct = default);
 
     /// <summary>
-    /// Déplace un objet d'un chemin source vers un chemin destination (Copy + Delete).
+    /// Dï¿½place un objet d'un chemin source vers un chemin destination (Copy + Delete).
     /// Retourne le nouveau chemin.
     /// </summary>
     Task<string> MoveAsync(string sourceBlobPath, string destinationBlobPath, CancellationToken ct = default);
 
     /// <summary>
-    /// Vérifie que le service de stockage est accessible.
+    /// Vï¿½rifie que le service de stockage est accessible.
     /// </summary>
     Task<bool> HealthCheckAsync(CancellationToken ct = default);
-}
+    /// <summary>
+    /// GÃ©nÃ¨re une URL Ã  accÃ¨s en lecture seule pour le chemin blob spÃ©cifiÃ© (fichier ou dossier).
+    /// En production : SAS token Azure Blob. En dÃ©veloppement local : chemin systÃ¨me de fichiers.
+    /// </summary>
+    Task<string> GenerateReadUrlAsync(string blobPath, TimeSpan? expiry = null, CancellationToken ct = default);}

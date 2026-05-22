@@ -11,7 +11,7 @@
       <am:Name>PBIRB</am:Name>
       <am:Version>15.7.1817.11</am:Version>
     </am:UpdatedBy>
-    <am:LastModifiedTimestamp>2026-04-22T15:55:43.9961173Z</am:LastModifiedTimestamp>
+    <am:LastModifiedTimestamp>2026-04-27T09:40:31.7837597Z</am:LastModifiedTimestamp>
   </am:AuthoringMetadata>
   <df:DefaultFontFamily>Segoe UI</df:DefaultFontFamily>
   <AutoRefresh>0</AutoRefresh>
@@ -574,27 +574,36 @@ ORDER BY change_pct ASC LIMIT 3;</CommandText>
     <DataSet Name="DS_Density_PC1">
       <Query>
         <DataSourceName>DataSource1</DataSourceName>
-        <CommandText>WITH RawData AS (
-    -- On récupère uniquement les données des 2 mois à comparer pour PC1
-    SELECT 
-        shipper_code,
-        report_month,
-        estimated_pct
+        <CommandText>WITH TargetMonths AS (
+    -- 1. On identifie le mois le plus récent (ex: 2026-04)
+    -- 2. On calcule le même mois l'année précédente (ex: 2025-04)
+    SELECT TO_CHAR(CAST(MAX(report_month) || '-01' AS DATE), 'YYYY-MM') as m_key
     FROM public.v_parr_industry
-    WHERE product_class = 'PC1' 
-    AND report_month IN ('2025-02', '2026-02') -- À adapter selon le format de votre base
+    UNION ALL
+    SELECT TO_CHAR(CAST(MAX(report_month) || '-01' AS DATE) - INTERVAL '1 year', 'YYYY-MM')
+    FROM public.v_parr_industry
+),
+RawData AS (
+    SELECT shipper_code, report_month, estimated_pct 
+    FROM public.v_parr_industry
+    WHERE product_class = 'PC1' -- N'oubliez pas de mettre PC2 pour le deuxième graphe
+    AND report_month IN (SELECT m_key FROM TargetMonths)
 ),
 BinnedData AS (
-    -- On regroupe les pourcentages par tranches de 2% pour créer les points de la courbe
     SELECT 
-        CASE WHEN report_month = '2026-02' THEN 'Feb-26' ELSE 'Feb-25' END as month_label,
-        ROUND(CAST(estimated_pct AS numeric) / 2.0) * 2.0 as pct_bin,
+        report_month,
+        (ROUND(CAST(estimated_pct AS numeric) / 2.0) * 2.0) / 100.0 as pct_bin,
         COUNT(DISTINCT shipper_code) as density_count
     FROM RawData
     GROUP BY report_month, ROUND(CAST(estimated_pct AS numeric) / 2.0) * 2.0
 )
-SELECT * FROM BinnedData 
-ORDER BY month_label, pct_bin;</CommandText>
+SELECT 
+    d.month_year as month_label, -- Récupère le format 'Apr-26' et 'Apr-25'
+    b.pct_bin, 
+    b.density_count
+FROM BinnedData b
+JOIN public.vw_dim_date d ON b.report_month = d.date_key
+ORDER BY b.report_month ASC, b.pct_bin ASC;</CommandText>
       </Query>
       <Fields>
         <Field Name="month_label">
@@ -608,6 +617,30 @@ ORDER BY month_label, pct_bin;</CommandText>
         <Field Name="density_count">
           <rd:TypeName>System.Int64</rd:TypeName>
           <DataField>density_count</DataField>
+        </Field>
+      </Fields>
+    </DataSet>
+    <DataSet Name="DataSet1">
+      <Query>
+        <DataSourceName>DataSource1</DataSourceName>
+        <CommandText>select * from vw_dim_date; </CommandText>
+      </Query>
+      <Fields>
+        <Field Name="date_key">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>date_key</DataField>
+        </Field>
+        <Field Name="month_year">
+          <rd:TypeName>System.String</rd:TypeName>
+          <DataField>month_year</DataField>
+        </Field>
+        <Field Name="year">
+          <rd:TypeName>System.Int32</rd:TypeName>
+          <DataField>year</DataField>
+        </Field>
+        <Field Name="month_num">
+          <rd:TypeName>System.Int32</rd:TypeName>
+          <DataField>month_num</DataField>
         </Field>
       </Fields>
     </DataSet>
@@ -1026,9 +1059,9 @@ ORDER BY month_label, pct_bin;</CommandText>
             </ChartNoDataMessage>
             <DataSetName>DS_Estimated_Evolution</DataSetName>
             <Top>27.54884mm</Top>
-            <Left>215.94838mm</Left>
+            <Left>190mm</Left>
             <Height>57.08252mm</Height>
-            <Width>108.91768mm</Width>
+            <Width>115.26768mm</Width>
             <ZIndex>1</ZIndex>
             <Style>
               <Border>
@@ -1060,8 +1093,8 @@ ORDER BY month_label, pct_bin;</CommandText>
             </Paragraphs>
             <Top>16.96559mm</Top>
             <Left>12.06498mm</Left>
-            <Height>14.224mm</Height>
-            <Width>217.88361mm</Width>
+            <Height>10.23047mm</Height>
+            <Width>258.52361mm</Width>
             <ZIndex>2</ZIndex>
             <Style>
               <Border>
@@ -1456,10 +1489,10 @@ PC2</Caption>
               </Style>
             </ChartNoDataMessage>
             <DataSetName>DS_CheckReads_Count</DataSetName>
-            <Top>9.06135cm</Top>
-            <Left>21.59484cm</Left>
+            <Top>9.37885cm</Top>
+            <Left>19.05484cm</Left>
             <Height>5.13442cm</Height>
-            <Width>10.8706cm</Width>
+            <Width>11.47193cm</Width>
             <ZIndex>3</ZIndex>
             <Style>
               <Border>
@@ -1492,8 +1525,8 @@ PC2</Caption>
             </Paragraphs>
             <Top>9.95559cm</Top>
             <Left>0.3175cm</Left>
-            <Height>2.22935cm</Height>
-            <Width>20.64536cm</Width>
+            <Height>2.77968cm</Height>
+            <Width>18.76153cm</Width>
             <ZIndex>4</ZIndex>
             <Style>
               <Border>
@@ -2255,6 +2288,7 @@ PC2</Caption>
                   <TextRun>
                     <Value>2A.1 ESTIMATED &amp; CHECK READS - PRODUCT CLASSES 1 &amp; 2</Value>
                     <Style>
+                      <FontFamily>Arial</FontFamily>
                       <FontSize>18pt</FontSize>
                       <FontWeight>Bold</FontWeight>
                       <Color>Brown</Color>
@@ -2264,8 +2298,8 @@ PC2</Caption>
                 <Style />
               </Paragraph>
             </Paragraphs>
-            <Top>18.01708cm</Top>
-            <Left>3.52637cm</Left>
+            <Top>17.06458cm</Top>
+            <Left>7.65387cm</Left>
             <Height>1.35607cm</Height>
             <Width>20.07225cm</Width>
             <ZIndex>15</ZIndex>
@@ -2279,18 +2313,398 @@ PC2</Caption>
               <PaddingBottom>2pt</PaddingBottom>
             </Style>
           </Textbox>
+          <Chart Name="Chart1">
+            <ChartCategoryHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart1_CategoryGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!pct_bin.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!pct_bin.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <Label>=Fields!pct_bin.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartCategoryHierarchy>
+            <ChartSeriesHierarchy>
+              <ChartMembers>
+                <ChartMember>
+                  <Group Name="Chart1_SeriesGroup">
+                    <GroupExpressions>
+                      <GroupExpression>=Fields!month_label.Value</GroupExpression>
+                    </GroupExpressions>
+                  </Group>
+                  <SortExpressions>
+                    <SortExpression>
+                      <Value>=Fields!month_label.Value</Value>
+                    </SortExpression>
+                  </SortExpressions>
+                  <Label>=Fields!month_label.Value</Label>
+                </ChartMember>
+              </ChartMembers>
+            </ChartSeriesHierarchy>
+            <ChartData>
+              <ChartSeriesCollection>
+                <ChartSeries Name="density_count">
+                  <ChartDataPoints>
+                    <ChartDataPoint>
+                      <ChartDataPointValues>
+                        <Y>=Sum(Fields!density_count.Value)</Y>
+                      </ChartDataPointValues>
+                      <ChartDataLabel>
+                        <Style />
+                      </ChartDataLabel>
+                      <Style>
+                        <Border>
+                          <Color>=IIF(Fields!month_label.Value = "Feb-25", "#4472C4", "#ED7D31")</Color>
+                          <Width>2pt</Width>
+                        </Border>
+                      </Style>
+                      <ChartMarker>
+                        <Type>Circle</Type>
+                        <Size>5pt</Size>
+                        <Style />
+                      </ChartMarker>
+                      <DataElementOutput>Output</DataElementOutput>
+                    </ChartDataPoint>
+                  </ChartDataPoints>
+                  <Type>Line</Type>
+                  <Subtype>Smooth</Subtype>
+                  <Style />
+                  <ChartEmptyPoints>
+                    <Style />
+                    <ChartMarker>
+                      <Style />
+                    </ChartMarker>
+                    <ChartDataLabel>
+                      <Style />
+                    </ChartDataLabel>
+                  </ChartEmptyPoints>
+                  <ValueAxisName>Primary</ValueAxisName>
+                  <CategoryAxisName>Primary</CategoryAxisName>
+                  <ChartSmartLabel>
+                    <CalloutLineColor>Black</CalloutLineColor>
+                    <MinMovingDistance>0pt</MinMovingDistance>
+                  </ChartSmartLabel>
+                </ChartSeries>
+              </ChartSeriesCollection>
+            </ChartData>
+            <ChartAreas>
+              <ChartArea Name="Default">
+                <ChartCategoryAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Enabled>False</Enabled>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                </ChartCategoryAxes>
+                <ChartValueAxes>
+                  <ChartAxis Name="Primary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                  <ChartAxis Name="Secondary">
+                    <Style>
+                      <Border>
+                        <Color>Gainsboro</Color>
+                        <Style>None</Style>
+                      </Border>
+                      <FontSize>8pt</FontSize>
+                      <Color>#5c5c5c</Color>
+                    </Style>
+                    <ChartAxisTitle>
+                      <Caption />
+                      <Style>
+                        <FontSize>9pt</FontSize>
+                        <Color>#5c5c5c</Color>
+                      </Style>
+                    </ChartAxisTitle>
+                    <ChartMajorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                    </ChartMajorGridLines>
+                    <ChartMinorGridLines>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>Dotted</Style>
+                        </Border>
+                      </Style>
+                    </ChartMinorGridLines>
+                    <ChartMajorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                          <Style>None</Style>
+                        </Border>
+                      </Style>
+                    </ChartMajorTickMarks>
+                    <ChartMinorTickMarks>
+                      <Style>
+                        <Border>
+                          <Color>Gainsboro</Color>
+                        </Border>
+                      </Style>
+                      <Length>0.5</Length>
+                    </ChartMinorTickMarks>
+                    <CrossAt>NaN</CrossAt>
+                    <Location>Opposite</Location>
+                    <Minimum>NaN</Minimum>
+                    <Maximum>NaN</Maximum>
+                    <ChartAxisScaleBreak>
+                      <Style />
+                    </ChartAxisScaleBreak>
+                  </ChartAxis>
+                </ChartValueAxes>
+                <Style>
+                  <BackgroundColor>#00ffffff</BackgroundColor>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                </Style>
+              </ChartArea>
+            </ChartAreas>
+            <ChartLegends>
+              <ChartLegend Name="Default">
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>8pt</FontSize>
+                </Style>
+                <Position>BottomCenter</Position>
+                <DockOutsideChartArea>true</DockOutsideChartArea>
+                <ChartLegendTitle>
+                  <Caption />
+                  <Style>
+                    <FontSize>8pt</FontSize>
+                    <FontWeight>Bold</FontWeight>
+                    <TextAlign>Center</TextAlign>
+                  </Style>
+                </ChartLegendTitle>
+                <HeaderSeparatorColor>Black</HeaderSeparatorColor>
+                <ColumnSeparatorColor>Black</ColumnSeparatorColor>
+              </ChartLegend>
+            </ChartLegends>
+            <ChartTitles>
+              <ChartTitle Name="Default">
+                <Caption>2A.1- 12 Month comparison (Average of PC1 Estimated Reads)</Caption>
+                <Style>
+                  <BackgroundGradientType>None</BackgroundGradientType>
+                  <FontSize>9pt</FontSize>
+                  <FontWeight>Normal</FontWeight>
+                  <TextAlign>Left</TextAlign>
+                  <VerticalAlign>Top</VerticalAlign>
+                  <Color>#a6a6a6</Color>
+                </Style>
+                <Position>TopLeft</Position>
+              </ChartTitle>
+            </ChartTitles>
+            <Palette>Pacific</Palette>
+            <ChartBorderSkin>
+              <Style>
+                <BackgroundColor>Gray</BackgroundColor>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <Color>White</Color>
+              </Style>
+            </ChartBorderSkin>
+            <ChartNoDataMessage Name="NoDataMessage">
+              <Caption>Aucune donnée disponible</Caption>
+              <Style>
+                <BackgroundGradientType>None</BackgroundGradientType>
+                <FontWeight>Bold</FontWeight>
+                <TextAlign>General</TextAlign>
+                <VerticalAlign>Top</VerticalAlign>
+              </Style>
+            </ChartNoDataMessage>
+            <DataSetName>DS_Density_PC1</DataSetName>
+            <Top>20.12103cm</Top>
+            <Left>1.94733cm</Left>
+            <Height>6.94266cm</Height>
+            <Width>11.9747cm</Width>
+            <ZIndex>16</ZIndex>
+            <Style>
+              <Border>
+                <Style>None</Style>
+              </Border>
+              <BackgroundColor>White</BackgroundColor>
+              <BackgroundGradientType>None</BackgroundGradientType>
+            </Style>
+          </Chart>
         </ReportItems>
-        <Height>228.93867mm</Height>
+        <Height>27.0637cm</Height>
         <Style>
           <Border>
             <Style>None</Style>
           </Border>
         </Style>
       </Body>
-      <Width>351.11274mm</Width>
+      <Width>32.48661cm</Width>
       <Page>
         <PageHeight>19.05cm</PageHeight>
         <PageWidth>33.86cm</PageWidth>
+        <InteractiveHeight>19.05cm</InteractiveHeight>
+        <InteractiveWidth>31cm</InteractiveWidth>
         <ColumnSpacing>0.13cm</ColumnSpacing>
         <Style />
       </Page>

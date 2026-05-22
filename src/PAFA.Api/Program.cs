@@ -17,8 +17,10 @@ using PAFA.Infrastructure.Persistence;
 using PAFA.Infrastructure.Repositories;
 using PAFA.Infrastructure.Repository;
 using PAFA.Infrastructure.Services;
-using PAFA.Infrastructure.Services.Notifications;
 using PAFA.Infrastructure.Services.PowerBi;
+using PAFA.Messaging.Configuration;
+using PAFA.Messaging.Services;
+using PAFA.Notifications.Settings;
 using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Storage;
 using PAFA.Reports.Handlers;
@@ -136,20 +138,23 @@ builder.Services.AddScoped<PAFA.Extraction.Services.FilePipelineCache>();
 builder.Services.AddSingleton<IIngestionPipelineQueue, IngestionPipelineQueue>();
 builder.Services.AddHostedService<PAFA.Api.BackgroundServices.IngestionPipelineWorker>();
 
+// ── Excel inspection service (used by ParseAndValidateFilesHandler) ───────────
+builder.Services.AddScoped<PAFA.Infrastructure.Parsing.ExcelInspectionService>();
+
 builder.Services.AddScoped<ISharePointFileHelper, SharePointFileHelper>();
 
-// ── Email service ───────────────────────────────────────────────────────────
-// Bind notification settings (SMTP + recipient list)
+// ── Notification service — Azure Service Bus ────────────────────────────────
+// Recipients and dispatch configuration
 builder.Services.Configure<NotificationSettings>(
     builder.Configuration.GetSection(NotificationSettings.SectionName));
+builder.Services.Configure<ServiceBusSettings>(
+    builder.Configuration.GetSection(ServiceBusSettings.SectionName));
 
-// Switch between real SMTP and logging-only based on configuration.
-// Set Notifications:UseSmtp = true in appsettings to enable real email sending.
-var useSmtp = builder.Configuration.GetValue<bool>("Notifications:UseSmtp");
-if (useSmtp)
-    builder.Services.AddScoped<IEmailService, SmtpEmailService>(); // ← active in Dev
-else
-    builder.Services.AddScoped<IEmailService, LoggingEmailService>();
+// ServiceBusNotificationService implements IEmailService and IAsyncDisposable.
+// Registered as Singleton because ServiceBusClient is thread-safe and designed for reuse.
+builder.Services.AddSingleton<ServiceBusNotificationService>();
+builder.Services.AddSingleton<IEmailService>(sp =>
+    sp.GetRequiredService<ServiceBusNotificationService>());
 
 // ═══════════════════════════════════════════════════════════════════════
 //  POWER BI EMBEDDED — Service Principal (App Owns Data)

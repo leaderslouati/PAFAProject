@@ -35,6 +35,9 @@ public class IngestionJob : BaseEntity
     /// <summary>Reference to parent job in case of retry.</summary>
     public Guid? ParentJobId { get; set; }
 
+    /// <summary>Correlation ID linking this job execution to all pipeline logs and notifications.</summary>
+    public Guid? CorrelationId { get; set; }
+
     // ── Navigation ─────────────────────────────────────────────────
     public IngestionJob? ParentJob { get; set; }
     public ICollection<IngestionJob> RetryJobs { get; set; } = new List<IngestionJob>();

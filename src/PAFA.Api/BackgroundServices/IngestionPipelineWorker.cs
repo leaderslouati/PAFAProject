@@ -8,19 +8,21 @@ namespace PAFA.Api.BackgroundServices;
 
 /// <summary>
 /// Background worker qui consomme la <see cref="IIngestionPipelineQueue"/>
-/// et exécute les 4 étapes du pipeline pour chaque fichier reçu, en émettant
-/// un événement SignalR <c>StepCompleted</c> après chaque étape.
+/// et exécute les 3 étapes du pipeline pour chaque fichier reçu, en émettant
+/// des événements SignalR après chaque étape.
 ///
-/// ??? Étapes et événements SignalR ????????????????????????????????????????????
-///   Step 1 — FileImport   : fichier déjà dans MinIO (fait par /start), notifié immédiatement
-///   Step 2 — Parsing      : ParseFileCommand
-///   Step 3 — Validation   : ValidateFileCommand
-///   Step 4 — Persistence  : PersistFileCommand
+/// ??? Étapes du pipeline ???????????????????????????????????????????????????????
+///   Step 1 — SharePointToMinIO : fichier déjà dans MinIO (fait par /start).
+///             ? Notifié immédiatement. Retour JSON : liste des fichiers non traités.
+///   Step 2 — ParseAndValidate  : Parse + Validation fusionnés dans la même étape.
+///             ? Résultat : rows[] avec {fileName, status("Processed"|"Failed")}
+///             ? Déclenché automatiquement. Sauvegarde les fichiers valides en blob.
+///   Step 3 — Persistence       : PersistFileCommand — insertion en base avec le bon statut.
 ///
-/// Événements émis :
-///   "PipelineStarted"  ? au début du traitement d'un fichier
-///   "StepCompleted"    ? après chaque étape (succès ou échec)
-///   "PipelineFinished" ? quand le fichier est entièrement traité
+/// Événements SignalR émis :
+///   "PendingFilesDiscovered" ? Step 1 : liste JSON des fichiers en attente
+///   "StepCompleted"          ? après chaque étape (succès ou échec)
+///   "PipelineFinished"       ? quand tous les fichiers du run sont traités
 /// </summary>
 public sealed class IngestionPipelineWorker(
     IIngestionPipelineQueue queue,
@@ -59,63 +61,78 @@ public sealed class IngestionPipelineWorker(
             "[PIPELINE_WORKER] Démarrage — FileId={FileId} FileName={File}",
             fileId, fileName);
 
-        // ?? Notification de démarrage du pipeline pour ce fichier ????????
-        await hub.Clients.All.SendAsync("PipelineStarted", new PipelineStartedPayload(
-            JobId: jobId,
-            Year: 0, Month: 0,  // période non disponible ici, le front l'a déjà via /start
-            TotalFiles: 1,
-            FileIds: [fileId]), cancellationToken: ct);
-
-        var succeeded = false;
-
-        // ?? Chaque fichier = scope DI isolé ???????????????????????????????
+        // ?? Chaque fichier = scope DI isolé ??????????????????????????????????
         // DbContext + FilePipelineCache neufs ? pas de conflit entre fichiers
         using var scope = scopeFactory.CreateScope();
         var mediator = scope.ServiceProvider.GetRequiredService<IMediator>();
 
-        // ?? Step 1 : File Import (déjà fait par /start ? MinIO ready) ????
-        // On notifie immédiatement avec la durée écoulée depuis l'enfilage
+        // ?? Step 1 : SharePoint ? MinIO (déjà fait par /start) ??????????????
+        // On notifie immédiatement que le fichier est prêt dans MinIO.
+        // Le payload "PendingFilesDiscovered" a déjà été émis par le contrôleur ;
+        // ici on confirme que ce fichier spécifique entre dans le worker.
         var d1 = Elapsed(runStart);
-        await NotifyStep(fileId, fileName, step: 1, stepName: "FileImport",
+        await NotifyStep(fileId, fileName, step: 1, stepName: "SharePointToMinIO",
             success: true, durationMs: d1,
-            details: new() { ["blobReady"] = true }, ct: ct);
+            details: new() { ["blobReady"] = true, ["fileName"] = fileName }, ct: ct);
 
-        // ?? Step 2 : Parsing ??????????????????????????????????????????????
+        // ?? Step 2 : Parse + Validate (fusionnés) ????????????????????????????
+        // Parse le fichier depuis MinIO, applique les règles de validation,
+        // puis déplace le blob vers "processed" ou "failed" selon le résultat.
         var t2 = DateTime.UtcNow;
-        var parseResult = await mediator.Send(new ParseFileCommand(fileId), ct);
-        var d2 = Elapsed(t2);
 
-        await NotifyStep(fileId, fileName, step: 2, stepName: "Parsing",
-            success: parseResult.Success, durationMs: d2,
-            error: parseResult.ErrorMessage,
-            details: parseResult.Success
-                ? new() { ["rowsRead"] = parseResult.TotalRows }
-                : null,
-            ct: ct);
+        var parseResult   = await mediator.Send(new ParseFileCommand(fileId), ct);
+        var d2Parse       = Elapsed(t2);
 
         if (!parseResult.Success)
         {
             logger.LogWarning("[PIPELINE_WORKER] Parse échoué — {File} | {Err}", fileName, parseResult.ErrorMessage);
+
+            var failedRow = new FileProcessingResultRow(
+                FileId:            fileId,
+                FileName:          fileName,
+                FileStatus:        "Failed",
+                RowsRead:          0,
+                RowsValid:         0,
+                RowsRejected:      0,
+                HasBlockingErrors: true,
+                ErrorMessage:      parseResult.ErrorMessage);
+
+            await NotifyStep(fileId, fileName, step: 2, stepName: "ParseAndValidate",
+                success: false, durationMs: d2Parse,
+                error: parseResult.ErrorMessage,
+                details: new() { ["result"] = failedRow }, ct: ct);
+
             await NotifyFinished(jobId, fileId, succeeded: false, runStart, ct);
             return;
         }
 
-        // ?? Step 3 : Validation ???????????????????????????????????????????
-        var t3 = DateTime.UtcNow;
         var validateResult = await mediator.Send(new ValidateFileCommand(fileId), ct);
-        var d3 = Elapsed(t3);
+        var d2             = Elapsed(t2);
 
-        await NotifyStep(fileId, fileName, step: 3, stepName: "Validation",
-            success: validateResult.Success, durationMs: d3,
-            error: validateResult.ErrorMessage,
-            details: validateResult.Success
-                ? new()
-                {
-                    ["rowsValid"]         = validateResult.ValidRowCount,
-                    ["rowsRejected"]      = validateResult.InvalidRowCount,
-                    ["hasBlockingErrors"] = validateResult.HasBlockingErrors
-                }
-                : null,
+        var fileStatus = validateResult.HasBlockingErrors ? "Failed" : "Processed";
+
+        var resultRow = new FileProcessingResultRow(
+            FileId:            fileId,
+            FileName:          fileName,
+            FileStatus:        fileStatus,
+            RowsRead:          parseResult.TotalRows,
+            RowsValid:         validateResult.ValidRowCount,
+            RowsRejected:      validateResult.InvalidRowCount,
+            HasBlockingErrors: validateResult.HasBlockingErrors,
+            ErrorMessage:      validateResult.HasBlockingErrors ? validateResult.ErrorMessage : null);
+
+        await NotifyStep(fileId, fileName, step: 2, stepName: "ParseAndValidate",
+            success: validateResult.Success, durationMs: d2,
+            error: validateResult.HasBlockingErrors ? validateResult.ErrorMessage : null,
+            details: new()
+            {
+                ["result"]            = resultRow,
+                ["rowsRead"]          = parseResult.TotalRows,
+                ["rowsValid"]         = validateResult.ValidRowCount,
+                ["rowsRejected"]      = validateResult.InvalidRowCount,
+                ["hasBlockingErrors"] = validateResult.HasBlockingErrors,
+                ["fileStatus"]        = fileStatus
+            },
             ct: ct);
 
         if (!validateResult.Success)
@@ -125,23 +142,29 @@ public sealed class IngestionPipelineWorker(
             return;
         }
 
-        // ?? Step 4 : Persistence ??????????????????????????????????????????
-        var t4 = DateTime.UtcNow;
+        // ?? Step 3 : Persistence en base de données ??????????????????????????
+        // Insère les MetricValues pour les lignes valides et finalise le statut.
+        var t3 = DateTime.UtcNow;
         var persistResult = await mediator.Send(new PersistFileCommand(fileId), ct);
-        var d4 = Elapsed(t4);
+        var d3 = Elapsed(t3);
 
-        succeeded = persistResult.Success;
+        var succeeded = persistResult.Success;
 
-        await NotifyStep(fileId, fileName, step: 4, stepName: "Persistence",
-            success: persistResult.Success, durationMs: d4,
+        await NotifyStep(fileId, fileName, step: 3, stepName: "Persistence",
+            success: persistResult.Success, durationMs: d3,
             error: persistResult.ErrorMessage,
             details: persistResult.Success
                 ? new()
                 {
                     ["metricsInserted"] = persistResult.MetricsInserted,
-                    ["blobPath"]        = persistResult.FinalBlobPath
+                    ["blobPath"]        = persistResult.FinalBlobPath,
+                    ["fileStatus"]      = "Processed"
                 }
-                : null,
+                : new Dictionary<string, object?>
+                {
+                    ["fileStatus"] = "Failed",
+                    ["error"]      = persistResult.ErrorMessage
+                },
             ct: ct);
 
         await NotifyFinished(jobId, fileId, succeeded, runStart, ct);
@@ -179,10 +202,10 @@ public sealed class IngestionPipelineWorker(
 
     private Task NotifyFinished(Guid jobId, Guid fileId, bool succeeded, DateTime runStart, CancellationToken ct)
         => hub.Clients.All.SendAsync("PipelineFinished", new PipelineFinishedPayload(
-            JobId:          jobId,
-            TotalFiles:     1,
-            Succeeded:      succeeded ? 1 : 0,
-            Failed:         succeeded ? 0 : 1,
+            JobId:           jobId,
+            TotalFiles:      1,
+            Succeeded:       succeeded ? 1 : 0,
+            Failed:          succeeded ? 0 : 1,
             TotalDurationMs: Elapsed(runStart)), ct);
 
     private static long Elapsed(DateTime since)

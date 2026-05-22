@@ -27,6 +27,8 @@
     <ProjectReference Include="..\..\src\PAFA.Domain\PAFA.Domain.csproj" />
     <ProjectReference Include="..\..\src\PAFA.Infrastructure\PAFA.Infrastructure.csproj" />
     <ProjectReference Include="..\..\src\PAFA.Extraction\PAFA.Extraction.csproj" />
+    <ProjectReference Include="..\..\src\PAFA.Notifications\PAFA.Notifications.csproj" />
+    <ProjectReference Include="..\..\src\PAFA.Messaging\PAFA.Messaging.csproj" />
   </ItemGroup>
 
 </Project>

@@ -1,12 +1,11 @@
 using System.Text;
 using PAFA.Domain.Models;
 
-namespace PAFA.Infrastructure.Services.Notifications;
+namespace PAFA.Notifications.Builders;
 
 /// <summary>
-/// Extracts the pure HTML-body and CSV-attachment building logic from
-/// <see cref="SmtpEmailService"/> into a stateless, dependency-free helper
-/// so that unit tests can validate email content without an SMTP connection.
+/// Stateless helper that builds HTML email bodies and CSV attachments
+/// for PAFA validation-failure notifications.
 /// </summary>
 public static class EmailContentBuilder
 {
@@ -36,7 +35,7 @@ public static class EmailContentBuilder
             <body>
             """);
 
-        sb.AppendLine($"<h2>? Validation Failure — {Encode(ctx.FileName)}</h2>");
+        sb.AppendLine($"<h2>âš  Validation Failure â€” {Encode(ctx.FileName)}</h2>");
 
         sb.AppendLine("<table style='border-collapse:collapse;width:auto;margin-bottom:16px'>");
         AppendInfoRow(sb, "File Name",        ctx.FileName);
@@ -73,12 +72,12 @@ public static class EmailContentBuilder
             sb.AppendLine($"""
                 <tr>
                   <td>{i + 1}</td>
-                  <td>{(e.RowNumber.HasValue ? e.RowNumber.ToString() : "—")}</td>
-                  <td>{Encode(e.ColumnName ?? "—")}</td>
+                  <td>{(e.RowNumber.HasValue ? e.RowNumber.ToString() : "â€”")}</td>
+                  <td>{Encode(e.ColumnName ?? "â€”")}</td>
                   <td>{Encode(e.ErrorCode)}</td>
                   <td><span class="{badge}">{Encode(e.Severity)}</span></td>
                   <td>{Encode(e.ErrorMessage)}</td>
-                  <td>{Encode(e.OriginalValue ?? "—")}</td>
+                  <td>{Encode(e.OriginalValue ?? "â€”")}</td>
                 </tr>
                 """);
         }

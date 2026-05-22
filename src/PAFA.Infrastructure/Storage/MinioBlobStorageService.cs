@@ -2,7 +2,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Minio;
 using Minio.DataModel.Args;
-using PAFA.Domain.Interfaces;
+
 
 namespace PAFA.Infrastructure.Storage;
 
@@ -63,7 +63,7 @@ public sealed class MinioBlobStorageService : IBlobStorageService
         var bucket = _baseBucket;
 
         // C#
-// Avant PutObjectAsync, vérifier/créer le bucket réel utilisé (_baseBucket)
+// Avant PutObjectAsync, vï¿½rifier/crï¿½er le bucket rï¿½el utilisï¿½ (_baseBucket)
         if (!await _client.BucketExistsAsync(new BucketExistsArgs().WithBucket(bucket), ct))
         {
             await _client.MakeBucketAsync(new MakeBucketArgs().WithBucket(bucket), ct);
@@ -200,5 +200,23 @@ public sealed class MinioBlobStorageService : IBlobStorageService
             _log.LogWarning(ex, "MinIO health check failed");
             return false;
         }
+    }
+
+    public async Task<string> GenerateReadUrlAsync(
+        string blobPath,
+        TimeSpan? expiry = null,
+        CancellationToken ct = default)
+    {
+        var idx = blobPath.IndexOf('/');
+        var bucket     = idx < 0 ? _baseBucket : blobPath[..idx];
+        var objectName = idx < 0 ? blobPath    : blobPath[(idx + 1)..];
+        var duration   = (int)(expiry ?? TimeSpan.FromHours(24)).TotalSeconds;
+
+        var args = new PresignedGetObjectArgs()
+            .WithBucket(bucket)
+            .WithObject(objectName)
+            .WithExpiry(duration);
+
+        return await _client.PresignedGetObjectAsync(args);
     }
 }

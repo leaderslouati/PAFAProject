@@ -11,31 +11,32 @@ namespace PAFA.Extraction.Handlers.Notifications;
 
 /// <summary>
 /// Handles <see cref="SendValidationFailureNotificationCommand"/>:
-///   1. Reads the recipient list from configuration.
-///   2. Builds the <see cref="ValidationFailureEmailContext"/> and sends the email.
+///   1. Reads the recipient list from configuration (ServiceBus:ValidationFailureRecipients).
+///   2. Dispatches the event via <see cref="IEmailService"/> ? Azure Service Bus.
 ///   3. Persists a <see cref="ValidationNotification"/> audit record.
 /// </summary>
 public sealed class SendValidationFailureNotificationHandler
     : IRequestHandler<SendValidationFailureNotificationCommand, SendValidationFailureNotificationResult>
 {
-    private readonly IEmailService _email;
+    private readonly IEmailService _notificationService;
     private readonly IUnitOfWork _uow;
     private readonly ILogger<SendValidationFailureNotificationHandler> _log;
     private readonly IReadOnlyList<string> _recipients;
 
     public SendValidationFailureNotificationHandler(
-        IEmailService email,
+        IEmailService notificationService,
         IUnitOfWork uow,
         IConfiguration configuration,
         ILogger<SendValidationFailureNotificationHandler> log)
     {
-        _email = email;
+        _notificationService = notificationService;
         _uow   = uow;
         _log   = log;
 
-        // Read the recipient list from configuration (falls back to empty list)
+        // Recipients are carried inside the Service Bus message payload
+        // so the downstream consumer knows who to alert.
         _recipients = configuration
-            .GetSection("Notifications:ValidationFailureRecipients")
+            .GetSection("ServiceBus:ValidationFailureRecipients")
             .Get<List<string>>() ?? [];
     }
 
@@ -65,11 +66,11 @@ public sealed class SendValidationFailureNotificationHandler
 
         try
         {
-            await _email.SendValidationFailureAsync(ctx, ct);
+            await _notificationService.SendValidationFailureAsync(ctx, ct);
             notification.Status = "SENT";
 
             _log.LogInformation(
-                "[NOTIFICATION] Validation failure email sent | File: {File} | Period: {Period} | Errors: {Errors}",
+                "[SERVICE-BUS] ValidationFailure event dispatched | File: {File} | Period: {Period} | Errors: {Errors}",
                 cmd.FileName, cmd.ReportingPeriod, cmd.AllErrors.Count);
         }
         catch (Exception ex)
@@ -78,12 +79,12 @@ public sealed class SendValidationFailureNotificationHandler
             notification.ErrorDetail = ex.Message;
 
             _log.LogError(ex,
-                "[NOTIFICATION] Failed to send validation failure email | File: {File}",
+                "[SERVICE-BUS] Failed to dispatch ValidationFailure event | File: {File}",
                 cmd.FileName);
         }
         finally
         {
-            // Always persist the audit record, regardless of send outcome
+            // Always persist the audit record regardless of dispatch outcome
             await _uow.ValidationNotifications.AddAsync(notification, ct);
             await _uow.SaveChangesAsync(ct);
         }
@@ -93,3 +94,4 @@ public sealed class SendValidationFailureNotificationHandler
             : new SendValidationFailureNotificationResult(false, notification.ErrorDetail);
     }
 }
+
