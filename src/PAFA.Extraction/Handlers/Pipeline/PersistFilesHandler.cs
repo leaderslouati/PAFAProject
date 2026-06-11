@@ -7,6 +7,8 @@ using PAFA.Domain.Interfaces;
 using PAFA.Domain.Models;
 using PAFA.Domain.Repositories;
 using PAFA.Extraction.Commands.Pipeline;
+using PAFA.Extraction.Mapping;
+using PAFA.Infrastructure.Parsing;
 using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Notifications.Settings;
 
@@ -34,6 +36,7 @@ public sealed class PersistFilesHandler : IRequestHandler<PersistFilesCommand, P
     private readonly IRemoteFileSource _remoteSource;
     private readonly IUnitOfWork _uow;
     private readonly IEmailService _emailService;
+    private readonly ExcelInspectionService _inspector;
     private readonly PowerBiDatasetRefreshService _pbiRefresh;
     private readonly NotificationSettings _notifSettings;
     private readonly PowerBiBatchExportSettings _pbiSettings;
@@ -44,6 +47,7 @@ public sealed class PersistFilesHandler : IRequestHandler<PersistFilesCommand, P
         IRemoteFileSource remoteSource,
         IUnitOfWork uow,
         IEmailService emailService,
+        ExcelInspectionService inspector,
         PowerBiDatasetRefreshService pbiRefresh,
         IOptions<NotificationSettings> notifSettings,
         PowerBiBatchExportSettings pbiSettings,
@@ -53,6 +57,7 @@ public sealed class PersistFilesHandler : IRequestHandler<PersistFilesCommand, P
         _remoteSource  = remoteSource;
         _uow           = uow;
         _emailService  = emailService;
+        _inspector     = inspector;
         _pbiRefresh    = pbiRefresh;
         _notifSettings = notifSettings.Value;
         _pbiSettings   = pbiSettings;
@@ -176,6 +181,52 @@ public sealed class PersistFilesHandler : IRequestHandler<PersistFilesCommand, P
             };
             await _uow.IngestionFiles.AddAsync(ingestionFile, ct);
             await _uow.SaveChangesAsync(ct);
+
+            // ── Extract and persist MetricValues from the processed file ──
+            var reportingPeriod = new DateOnly(year, month, 1);
+            long rowsLoaded = 0;
+            try
+            {
+                using var dataStream = await _blobService.DownloadStreamAsync(newBlobPath, ct);
+                var inspection = _inspector.Inspect(dataStream, result.FileName);
+
+                var rawRows = inspection.DataRows.Select(dr => new RawDataRow
+                {
+                    RowNumber = dr.RowNumber,
+                    SheetName = dr.SheetName,
+                    Cells     = dr.Values.ToDictionary(
+                        kv => kv.Key.ToLowerInvariant().Replace(" ", ""),
+                        kv => (string?)kv.Value,
+                        StringComparer.OrdinalIgnoreCase)
+                });
+
+                var metrics = rawRows
+                    .SelectMany(row => MetricValueMapper.MapToMetricValues(
+                        row, ingestionFile.Id, reportingPeriod))
+                    .ToList();
+
+                if (metrics.Count > 0)
+                {
+                    await _uow.MetricValues.AddRangeAsync(metrics, ct);
+                    await _uow.SaveChangesAsync(ct);
+                    rowsLoaded = metrics.Count;
+                }
+
+                ingestionFile.RowsRead  = inspection.DataRows.Count;
+                ingestionFile.RowsValid = inspection.DataRows.Count;
+                _uow.IngestionFiles.Update(ingestionFile);
+                await _uow.SaveChangesAsync(ct);
+
+                _log.LogInformation(
+                    "MetricValues persisted: {Count} metrics from {FileName} — CorrelationId: {CorrelationId}",
+                    rowsLoaded, result.FileName, correlationId);
+            }
+            catch (Exception metricEx)
+            {
+                _log.LogError(metricEx,
+                    "MetricValue extraction failed for {FileName} (file persisted OK) — CorrelationId: {CorrelationId}",
+                    result.FileName, correlationId);
+            }
 
             output.Add(new PersistedFileResult(
                 result.FileName, "Persisted", ingestionFile.Id, newBlobPath));

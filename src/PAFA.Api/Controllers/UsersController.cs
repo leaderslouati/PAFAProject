@@ -8,11 +8,11 @@ using System.Security.Claims;
 namespace PAFA.Api.Controllers;
 
 /// <summary>
-/// User management endpoints — restricted to the PafaAdmin role.
+/// User management endpoints ï¿½ restricted to the PafaAdmin role.
 /// </summary>
 [ApiController]
 [Route("api/[controller]")]
-[Authorize(Roles = "PafaAdmin")]
+[Authorize(Policy = "CanCreateUser")]
 public class UsersController(
     IMediator mediator,
     IValidator<CreateUserCommand> validator) : ControllerBase
@@ -34,7 +34,7 @@ public class UsersController(
     public async Task<IActionResult> CreateUser(
         [FromBody] CreateUserRequest request, CancellationToken ct)
     {
-        // Extract the admin's identity from the JWT — used for audit trail.
+        // Extract the admin's identity from the JWT ï¿½ used for audit trail.
         var adminId = User.FindFirstValue(ClaimTypes.NameIdentifier)
                       ?? User.FindFirstValue("sub")
                       ?? "unknown";
@@ -98,7 +98,7 @@ public class UsersController(
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public IActionResult GetUserById(Guid id)
     {
-        // Placeholder — implement GetUserByIdQuery when needed.
+        // Placeholder ï¿½ implement GetUserByIdQuery when needed.
         return Ok(new { id });
     }
 }

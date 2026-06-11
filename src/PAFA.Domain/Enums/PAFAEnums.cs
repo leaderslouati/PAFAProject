@@ -56,7 +56,7 @@ public enum ExportFormat
 /// <summary>Outcome of a single file during the Import step (Step 1).</summary>
 public enum ImportStatus
 {
-    Imported, SkippedInvalidName, SkippedInvalidFolder
+    Imported, SkippedInvalidName, SkippedInvalidFolder, SkippedAlreadyProcessed
 }
 
 /// <summary>Overall status of a pipeline execution tracked by PipelineBackgroundService.</summary>

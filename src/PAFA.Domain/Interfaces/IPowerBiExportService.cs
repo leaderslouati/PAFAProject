@@ -1,58 +1,60 @@
 // ═══════════════════════════════════════════════════════════
 // PAFA.Domain/Interfaces/IPowerBiExportService.cs
-// PURPOSE: Contract for generating Power BI embed tokens and
-//          triggering server-side report exports (PDF/PPTX).
+// PURPOSE: Contract for on-demand Power BI report export
+//          (embed token generation + PDF/PPTX export).
+//          Used by EmbedController for the React frontend.
 // ═══════════════════════════════════════════════════════════
 namespace PAFA.Domain.Interfaces;
 
+// ── Enums ────────────────────────────────────────────────────────────
+
 /// <summary>
-/// Report audience determines which Power BI dataset/report is used
-/// and whether EffectiveIdentity (RLS) is applied.
+/// Identifies which Power BI report/dataset pair to use.
+/// Industry = Schedule 2A (anonymised, uses v_parr_industry).
+/// Pac      = Schedule 2B (non-anonymised, uses v_parr_pac).
 /// </summary>
 public enum PbiReportAudience
 {
-    /// <summary>
-    /// Schedule 2A — anonymised. Uses v_parr_industry dataset.
-    /// EffectiveIdentity username = AliasCode (Shipper role).
-    /// </summary>
-    Industry = 0,
-
-    /// <summary>
-    /// Schedule 2B — non-anonymised. Uses v_parr_pac dataset.
-    /// No RLS filter — PAC / PAFA admin access.
-    /// </summary>
-    Pac = 1
+    Industry,
+    Pac
 }
 
-/// <summary>
-/// Result of a Power BI embed token request.
-/// Used by the web frontend to render embedded reports.
-/// </summary>
-public record EmbedTokenResult(
-    string EmbedUrl,
-    string EmbedToken,
-    DateTimeOffset ExpiresAt,
-    string ReportId,
-    string WorkspaceId);
-
-/// <summary>
-/// Supported export file formats for Power BI REST export.
-/// </summary>
+/// <summary>Export file format for Power BI reports.</summary>
 public enum PbiExportFormat
 {
     Pdf,
     Pptx
 }
 
+// ── DTOs ─────────────────────────────────────────────────────────────
+
+/// <summary>
+/// Result returned when generating an embed token for the React frontend.
+/// The React app passes these to powerbi-client-react to render the report.
+/// </summary>
+public record EmbedTokenResult(
+    string Token,
+    string EmbedUrl,
+    string ReportId,
+    string WorkspaceId,
+    DateTime Expiry);
+
+// ── Interface ────────────────────────────────────────────────────────
+
+/// <summary>
+/// On-demand Power BI operations:
+///  - Generate embed token (for React embedding)
+///  - Export report to PDF/PPTX (server-side)
+/// </summary>
 public interface IPowerBiExportService
 {
     /// <summary>
-    /// Generates a Power BI embed token for front-end embedding.
-    /// For Industry audience: applies EffectiveIdentity with the shipper's AliasCode.
-    /// For PAC audience: generates an unrestricted token.
+    /// Generates an embed token for a Power BI report.
+    /// For Industry audience, applies EffectiveIdentity with the shipper's AliasCode
+    /// so that RLS filters data to that shipper only.
     /// </summary>
-    /// <param name="audience">Industry (anon) or PAC (non-anon).</param>
-    /// <param name="aliasCode">Required when audience = Industry.</param>
+    /// <param name="audience">Industry (2A) or Pac (2B).</param>
+    /// <param name="aliasCode">Shipper alias code — required for Industry, ignored for Pac.</param>
     /// <param name="ct">Cancellation token.</param>
     Task<EmbedTokenResult> GenerateEmbedTokenAsync(
         PbiReportAudience audience,
@@ -60,14 +62,11 @@ public interface IPowerBiExportService
         CancellationToken ct = default);
 
     /// <summary>
-    /// Triggers a server-side export on the Power BI service and
-    /// returns a stream of the generated file (PDF or PPTX).
-    /// Polls until the export is complete or the timeout is reached.
+    /// Exports a Power BI report to a file (PDF or PPTX).
+    /// For Industry audience, applies EffectiveIdentity so the exported file
+    /// only contains the shipper's anonymised data.
     /// </summary>
-    /// <param name="audience">Industry (anon) or PAC (non-anon).</param>
-    /// <param name="format">PDF or PPTX.</param>
-    /// <param name="aliasCode">Required when audience = Industry.</param>
-    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Tuple of (file stream, suggested file name).</returns>
     Task<(Stream Content, string FileName)> ExportReportAsync(
         PbiReportAudience audience,
         PbiExportFormat format,

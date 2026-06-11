@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.Extensions.Logging;
 using PAFA.Domain.Enums;
 using PAFA.Domain.Interfaces;
+using PAFA.Domain.IRepository;
 using PAFA.Extraction.Commands.Pipeline;
 using PAFA.Extraction.Validations;
 
@@ -24,15 +25,18 @@ public sealed class ImportFilesHandler : IRequestHandler<ImportFilesCommand, Imp
 
     private readonly IRemoteFileSource _remoteSource;
     private readonly IBlobStorageService _blobService;
+    private readonly IIngestionFileRepository _fileRepo;
     private readonly ILogger<ImportFilesHandler> _log;
 
     public ImportFilesHandler(
         IRemoteFileSource remoteSource,
         IBlobStorageService blobService,
+        IIngestionFileRepository fileRepo,
         ILogger<ImportFilesHandler> log)
     {
         _remoteSource = remoteSource;
         _blobService  = blobService;
+        _fileRepo     = fileRepo;
         _log          = log;
     }
 
@@ -71,6 +75,10 @@ public sealed class ImportFilesHandler : IRequestHandler<ImportFilesCommand, Imp
             "{Count} file(s) found in SharePoint {Path} — CorrelationId: {CorrelationId}",
             remoteFiles.Count, remotePath, correlationId);
 
+        // ── Anti-duplicate: load already-processed file names + dates ──────
+        var alreadyLoaded = await _fileRepo.GetAlreadyLoadedFileNamesAsync(year, month, ct);
+        var loadedDates   = await _fileRepo.GetLoadedFileModificationDatesAsync(year, month, ct);
+
         var importedFiles = new List<ImportedFile>();
 
         foreach (var remoteFile in remoteFiles)
@@ -88,6 +96,32 @@ public sealed class ImportFilesHandler : IRequestHandler<ImportFilesCommand, Imp
                     ImportStatus.SkippedInvalidFolder,
                     "File found outside the expected Year/Month folder structure"));
                 continue;
+            }
+
+            // ── Anti-duplicate: skip files already processed with same date ─
+            if (alreadyLoaded.Contains(remoteFile.FileName))
+            {
+                // Check if file was modified since last processing
+                var isModified = loadedDates.TryGetValue(remoteFile.FileName, out var lastKnown)
+                    && remoteFile.LastModified > lastKnown;
+
+                if (!isModified)
+                {
+                    _log.LogInformation(
+                        "Skipped (already processed, unchanged) — File: {FileName} — CorrelationId: {CorrelationId}",
+                        remoteFile.FileName, correlationId);
+
+                    importedFiles.Add(new ImportedFile(
+                        remoteFile.FileName,
+                        string.Empty,
+                        ImportStatus.SkippedAlreadyProcessed,
+                        "File already processed and unchanged since last ingestion"));
+                    continue;
+                }
+
+                _log.LogInformation(
+                    "File {FileName} was modified since last processing — re-importing. CorrelationId: {CorrelationId}",
+                    remoteFile.FileName, correlationId);
             }
 
             // ── File name validation ───────────────────────────────────────

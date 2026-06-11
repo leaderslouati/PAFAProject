@@ -1,0 +1,332 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ═══════════════════════════════════════════════════════════════════════
+  PAFA — Schedule 2A.1: Estimated and Check Reads (Products 1 & 2)
+  RDL Paginated Report — Anonymised (Industry)
+
+  PURPOSE:
+    Pixel-perfect paginated report for PDF/PPTX export.
+    Connects to PostgreSQL via the v_parr_industry view (DirectQuery).
+    Uses alias_code (NEVER real_shipper_name) for compliance.
+
+  HOW TO USE:
+    1. Open in SQL Server Report Builder or Power BI Report Builder.
+    2. Update the data source connection string to your PostgreSQL server.
+    3. Publish to Power BI Service (Premium capacity required for paginated).
+    4. Or use locally with SSRS.
+
+  DATA SOURCE:
+    PostgreSQL → v_parr_industry (anonymised)
+    Joined with vw_dim_shipper, vw_dim_date
+
+  PARAMETERS:
+    @ReportingPeriod — YYYY-MM format (e.g. "2026-03")
+    @ProductClass    — Product class filter (e.g. "1", "2")
+  ═══════════════════════════════════════════════════════════════════════
+-->
+<Report xmlns="http://schemas.microsoft.com/sqlserver/reporting/2016/01/reportdefinition"
+        xmlns:rd="http://schemas.microsoft.com/SQLServer/reporting/reportdesigner">
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  REPORT METADATA                                                -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <Description>Schedule 2A.1 — Estimated and Check Reads (Products 1 &amp; 2) — Anonymised Industry Report</Description>
+  <Author>PAFA System</Author>
+
+  <AutoRefresh>0</AutoRefresh>
+
+  <ReportSections>
+    <ReportSection>
+      <Body>
+        <Height>29.7cm</Height>
+        <ReportItems>
+
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <!--  TITLE                                                     -->
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <Textbox Name="txtReportTitle">
+            <CanGrow>true</CanGrow>
+            <Top>0.5cm</Top>
+            <Left>1cm</Left>
+            <Width>18cm</Width>
+            <Height>1.5cm</Height>
+            <Value>Schedule 2A.1 — Estimated and Check Reads (Products 1 &amp; 2)</Value>
+            <Style>
+              <FontFamily>Segoe UI</FontFamily>
+              <FontSize>18pt</FontSize>
+              <FontWeight>Bold</FontWeight>
+              <Color>#1F4E79</Color>
+            </Style>
+          </Textbox>
+
+          <Textbox Name="txtSubtitle">
+            <CanGrow>true</CanGrow>
+            <Top>2.2cm</Top>
+            <Left>1cm</Left>
+            <Width>18cm</Width>
+            <Height>0.8cm</Height>
+            <Value>="Reporting Period: " &amp; Parameters!ReportingPeriod.Value &amp; " | Generated: " &amp; Format(Now(), "dd MMM yyyy HH:mm")</Value>
+            <Style>
+              <FontFamily>Segoe UI</FontFamily>
+              <FontSize>10pt</FontSize>
+              <Color>#555555</Color>
+            </Style>
+          </Textbox>
+
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <!--  COMPLIANCE SUMMARY TABLE                                  -->
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <Tablix Name="tblComplianceSummary">
+            <Top>3.5cm</Top>
+            <Left>1cm</Left>
+            <Width>18cm</Width>
+            <TablixBody>
+              <TablixColumns>
+                <TablixColumn><Width>4cm</Width></TablixColumn>
+                <TablixColumn><Width>3cm</Width></TablixColumn>
+                <TablixColumn><Width>3cm</Width></TablixColumn>
+                <TablixColumn><Width>3cm</Width></TablixColumn>
+                <TablixColumn><Width>2.5cm</Width></TablixColumn>
+                <TablixColumn><Width>2.5cm</Width></TablixColumn>
+              </TablixColumns>
+              <TablixRows>
+                <!-- Header Row -->
+                <TablixRow>
+                  <Height>0.8cm</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="hdrShipper"><Value>Shipper Code</Value>
+                          <Style><FontWeight>Bold</FontWeight><BackgroundColor>#1F4E79</BackgroundColor><Color>White</Color><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="hdrReadPerf"><Value>Read Perf %</Value>
+                          <Style><FontWeight>Bold</FontWeight><BackgroundColor>#1F4E79</BackgroundColor><Color>White</Color><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="hdrEstimated"><Value>Estimated %</Value>
+                          <Style><FontWeight>Bold</FontWeight><BackgroundColor>#1F4E79</BackgroundColor><Color>White</Color><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="hdrCheckRead"><Value>Check Reads</Value>
+                          <Style><FontWeight>Bold</FontWeight><BackgroundColor>#1F4E79</BackgroundColor><Color>White</Color><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="hdrTotalSites"><Value>Total Sites</Value>
+                          <Style><FontWeight>Bold</FontWeight><BackgroundColor>#1F4E79</BackgroundColor><Color>White</Color><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="hdrCompliant"><Value>Compliant</Value>
+                          <Style><FontWeight>Bold</FontWeight><BackgroundColor>#1F4E79</BackgroundColor><Color>White</Color><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+                <!-- Detail Row (bound to dataset) -->
+                <TablixRow>
+                  <Height>0.6cm</Height>
+                  <TablixCells>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="valShipper"><Value>=Fields!shipper_code.Value</Value>
+                          <Style><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="valReadPerf"><Value>=Format(Fields!read_perf_pct.Value, "0.00")</Value>
+                          <Style><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Right</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="valEstimated"><Value>=Format(Fields!estimated_pct.Value, "0.00")</Value>
+                          <Style><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Right</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="valCheckRead"><Value>=Fields!check_read_count.Value</Value>
+                          <Style><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Right</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="valTotalSites"><Value>=Fields!total_sites.Value</Value>
+                          <Style><FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Right</TextAlign></Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                    <TablixCell>
+                      <CellContents>
+                        <Textbox Name="valCompliant">
+                          <Value>=IIF(Fields!is_compliant.Value = 1, "✓ Yes", "✗ No")</Value>
+                          <Style>
+                            <FontFamily>Segoe UI</FontFamily><FontSize>9pt</FontSize><TextAlign>Center</TextAlign>
+                            <Color>=IIF(Fields!is_compliant.Value = 1, "#2E7D32", "#C62828")</Color>
+                            <FontWeight>Bold</FontWeight>
+                          </Style>
+                        </Textbox>
+                      </CellContents>
+                    </TablixCell>
+                  </TablixCells>
+                </TablixRow>
+              </TablixRows>
+            </TablixBody>
+
+            <TablixColumnHierarchy>
+              <TablixMembers>
+                <TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/><TablixMember/>
+              </TablixMembers>
+            </TablixColumnHierarchy>
+            <TablixRowHierarchy>
+              <TablixMembers>
+                <!-- Header (static) -->
+                <TablixMember>
+                  <KeepWithGroup>After</KeepWithGroup>
+                </TablixMember>
+                <!-- Detail (dynamic, one row per record) -->
+                <TablixMember>
+                  <Group Name="DetailGroup"/>
+                </TablixMember>
+              </TablixMembers>
+            </TablixRowHierarchy>
+
+            <DataSetName>dsIndustryPerformance</DataSetName>
+          </Tablix>
+
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <!--  INDUSTRY AVERAGE SUMMARY BOX                              -->
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <Textbox Name="txtIndustryAvgLabel">
+            <Top>20cm</Top><Left>1cm</Left><Width>6cm</Width><Height>0.8cm</Height>
+            <Value>Industry Average (Read Perf %):</Value>
+            <Style><FontFamily>Segoe UI</FontFamily><FontSize>11pt</FontSize><FontWeight>Bold</FontWeight><Color>#1F4E79</Color></Style>
+          </Textbox>
+
+          <Textbox Name="txtIndustryAvgValue">
+            <Top>20cm</Top><Left>7cm</Left><Width>4cm</Width><Height>0.8cm</Height>
+            <Value>=Format(Avg(Fields!read_perf_pct.Value), "0.00") &amp; "%"</Value>
+            <Style><FontFamily>Segoe UI</FontFamily><FontSize>14pt</FontSize><FontWeight>Bold</FontWeight><Color>#2E7D32</Color></Style>
+          </Textbox>
+
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <!--  FOOTER                                                    -->
+          <!-- ══════════════════════════════════════════════════════════ -->
+          <Textbox Name="txtFooter">
+            <Top>27cm</Top><Left>1cm</Left><Width>18cm</Width><Height>0.6cm</Height>
+            <Value>="PAFA — Performance Assurance Framework Agreement | Schedule 2A.1 | Page " &amp; Globals!PageNumber &amp; " of " &amp; Globals!TotalPages</Value>
+            <Style><FontFamily>Segoe UI</FontFamily><FontSize>8pt</FontSize><Color>#888888</Color><TextAlign>Center</TextAlign></Style>
+          </Textbox>
+
+        </ReportItems>
+      </Body>
+
+      <Width>21cm</Width>
+
+      <Page>
+        <PageHeight>29.7cm</PageHeight>
+        <PageWidth>21cm</PageWidth>
+        <TopMargin>1cm</TopMargin>
+        <BottomMargin>1cm</BottomMargin>
+        <LeftMargin>1.5cm</LeftMargin>
+        <RightMargin>1.5cm</RightMargin>
+      </Page>
+    </ReportSection>
+  </ReportSections>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  DATA SOURCES                                                    -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <DataSources>
+    <DataSource Name="PafaPostgreSQL">
+      <ConnectionProperties>
+        <!--
+          UPDATE this connection string to match your environment.
+          For Power BI Service, use a gateway data source instead.
+        -->
+        <DataProvider>ODBC</DataProvider>
+        <ConnectString>Driver={PostgreSQL Unicode};Server=localhost;Port=5432;Database=pafadb;Uid=postgres;Pwd=postgres;</ConnectString>
+        <IntegratedSecurity>false</IntegratedSecurity>
+      </ConnectionProperties>
+    </DataSource>
+  </DataSources>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  DATASETS                                                        -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <DataSets>
+    <DataSet Name="dsIndustryPerformance">
+      <Query>
+        <DataSourceName>PafaPostgreSQL</DataSourceName>
+        <CommandType>Text</CommandType>
+        <CommandText>
+          SELECT
+              vi.shipper_code,
+              vi.report_month,
+              vi.product_class,
+              vi.read_perf_pct,
+              vi.estimated_pct,
+              vi.check_read_count,
+              vi.total_sites,
+              vi.is_compliant,
+              vi.unc_threshold
+          FROM v_parr_industry vi
+          WHERE vi.report_month = ?
+            AND vi.product_class IN ('1', '2')
+          ORDER BY vi.shipper_code, vi.product_class
+        </CommandText>
+        <QueryParameters>
+          <QueryParameter Name="@ReportingPeriod">
+            <Value>=Parameters!ReportingPeriod.Value</Value>
+          </QueryParameter>
+        </QueryParameters>
+      </Query>
+      <Fields>
+        <Field Name="shipper_code"><DataField>shipper_code</DataField></Field>
+        <Field Name="report_month"><DataField>report_month</DataField></Field>
+        <Field Name="product_class"><DataField>product_class</DataField></Field>
+        <Field Name="read_perf_pct"><DataField>read_perf_pct</DataField></Field>
+        <Field Name="estimated_pct"><DataField>estimated_pct</DataField></Field>
+        <Field Name="check_read_count"><DataField>check_read_count</DataField></Field>
+        <Field Name="total_sites"><DataField>total_sites</DataField></Field>
+        <Field Name="is_compliant"><DataField>is_compliant</DataField></Field>
+        <Field Name="unc_threshold"><DataField>unc_threshold</DataField></Field>
+      </Fields>
+    </DataSet>
+  </DataSets>
+
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <!--  REPORT PARAMETERS                                               -->
+  <!-- ════════════════════════════════════════════════════════════════ -->
+  <ReportParameters>
+    <ReportParameter Name="ReportingPeriod">
+      <DataType>String</DataType>
+      <Prompt>Reporting Period (YYYY-MM)</Prompt>
+      <DefaultValue>
+        <Values><Value>=Format(DateAdd("m", -1, Today()), "yyyy-MM")</Value></Values>
+      </DefaultValue>
+    </ReportParameter>
+  </ReportParameters>
+
+</Report>

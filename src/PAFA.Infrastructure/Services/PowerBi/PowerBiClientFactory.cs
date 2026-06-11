@@ -1,46 +1,41 @@
-// ═══════════════════════════════════════════════════════════
-// PAFA.Infrastructure/Services/PowerBi/PowerBiClientFactory.cs
-// PURPOSE: Acquires an AAD token via MSAL (client credentials)
-//          and returns an authenticated PowerBIClient instance.
-// ═══════════════════════════════════════════════════════════
 using Microsoft.Identity.Client;
 using Microsoft.PowerBI.Api;
 using Microsoft.Rest;
 
 namespace PAFA.Infrastructure.Services.PowerBi;
 
-public sealed class PowerBiClientFactory(PowerBiSettings settings)
+/// <summary>
+/// Creates authenticated <see cref="PowerBIClient"/> instances
+/// using MSAL Service Principal (Client Credentials) flow.
+/// Registered as Singleton — MSAL handles token caching internally.
+/// </summary>
+public sealed class PowerBiClientFactory
 {
-    // Power BI REST API scope — fixed value, not configurable.
-    private static readonly string[] Scopes =
-        ["https://analysis.windows.net/powerbi/api/.default"];
+    private readonly PowerBiSettings _settings;
+    private readonly IConfidentialClientApplication _msal;
+
+    public PowerBiClientFactory(PowerBiSettings settings)
+    {
+        _settings = settings;
+        _msal = ConfidentialClientApplicationBuilder
+            .Create(_settings.ClientId)
+            .WithClientSecret(_settings.ClientSecret)
+            .WithAuthority(_settings.Authority)
+            .Build();
+    }
 
     /// <summary>
-    /// Acquires an AAD access token using the configured service principal
-    /// and returns a ready-to-use <see cref="PowerBIClient"/>.
+    /// Acquires a token and returns a ready-to-use <see cref="PowerBIClient"/>.
+    /// Token caching is handled by MSAL — repeated calls within the token
+    /// lifetime return a cached token without a network round-trip.
     /// </summary>
     public async Task<PowerBIClient> CreateAsync(CancellationToken ct = default)
     {
-        if (string.IsNullOrWhiteSpace(settings.TenantId)
-            || string.IsNullOrWhiteSpace(settings.ClientId)
-            || string.IsNullOrWhiteSpace(settings.ClientSecret))
-        {
-            throw new InvalidOperationException(
-                "Power BI service principal credentials are not configured. " +
-                "Set PowerBi:TenantId, PowerBi:ClientId and PowerBi:ClientSecret.");
-        }
-
-        var app = ConfidentialClientApplicationBuilder
-            .Create(settings.ClientId)
-            .WithClientSecret(settings.ClientSecret)
-            .WithTenantId(settings.TenantId)
-            .Build();
-
-        var authResult = await app
-            .AcquireTokenForClient(Scopes)
+        var authResult = await _msal
+            .AcquireTokenForClient(_settings.Scopes)
             .ExecuteAsync(ct);
 
         var tokenCredentials = new TokenCredentials(authResult.AccessToken, "Bearer");
-        return new PowerBIClient(new Uri("https://api.powerbi.com/"), tokenCredentials);
+        return new PowerBIClient(new Uri("https://api.powerbi.com"), tokenCredentials);
     }
 }

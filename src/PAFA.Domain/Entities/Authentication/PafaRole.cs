@@ -20,4 +20,5 @@ public class PafaRole
 
     // ── Navigation ─────────────────────────────────────────────
     public ICollection<PafaUserRole> UserRoles { get; set; } = new List<PafaUserRole>();
+    public ICollection<PafaRolePermission> RolePermissions { get; set; } = new List<PafaRolePermission>();
 }

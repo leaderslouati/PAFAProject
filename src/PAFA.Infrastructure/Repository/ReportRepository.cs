@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PAFA.Domain.Entities;
+using PAFA.Domain.Enums;
 using PAFA.Domain.IRepository;
 using PAFA.Infrastructure.Persistence;
 
@@ -16,6 +17,17 @@ public class ReportRepository(PafaDbContext ctx)
     {
         return await ctx.Set<Report>()
             .Where(r => r.ReportingPeriod == reportingPeriod && !r.IsDeleted)
+            .OrderBy(r => r.ScheduleNumber)
+            .ToListAsync(ct);
+    }
+
+    public async Task<IReadOnlyList<Report>> GetByPeriodAndAudienceAsync(
+        DateOnly reportingPeriod, ReportAudience audience, CancellationToken ct = default)
+    {
+        return await ctx.Set<Report>()
+            .Where(r => r.ReportingPeriod == reportingPeriod
+                     && r.Audience == audience
+                     && !r.IsDeleted)
             .OrderBy(r => r.ScheduleNumber)
             .ToListAsync(ct);
     }

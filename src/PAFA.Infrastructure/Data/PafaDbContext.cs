@@ -17,6 +17,8 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     public DbSet<PafaUser> PafaUsers => Set<PafaUser>();
     public DbSet<PafaRole> PafaRoles => Set<PafaRole>();
     public DbSet<PafaUserRole> PafaUserRoles => Set<PafaUserRole>();
+    public DbSet<PafaPermission> PafaPermissions => Set<PafaPermission>();
+    public DbSet<PafaRolePermission> PafaRolePermissions => Set<PafaRolePermission>();
 
     // ── Referential ─────────────────────────────────────────
     public DbSet<Shipper> Shippers => Set<Shipper>();
@@ -54,6 +56,8 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
         modelBuilder.ApplyConfiguration(new PafaUserConfiguration());
         modelBuilder.ApplyConfiguration(new PafaUserRoleConfiguration());
         modelBuilder.ApplyConfiguration(new ShipperAliasConfiguration());
+        modelBuilder.ApplyConfiguration(new PafaPermissionConfiguration());
+        modelBuilder.ApplyConfiguration(new PafaRolePermissionConfiguration());
 
         // Power BI configurations
         modelBuilder.ApplyConfiguration(new FactReadPerformanceConfiguration());

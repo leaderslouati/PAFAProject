@@ -21,6 +21,8 @@ using PAFA.Infrastructure.Services.PowerBi;
 using PAFA.Messaging.Configuration;
 using PAFA.Messaging.Services;
 using PAFA.Notifications.Settings;
+using Microsoft.AspNetCore.Authentication;
+using PAFA.Api.Authorization;
 using PAFA.Infrastructure.SharePoint;
 using PAFA.Infrastructure.Storage;
 using PAFA.Reports.Handlers;
@@ -102,7 +104,26 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("CanCreateUser",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "users.create"));
+    options.AddPolicy("CanDeleteUser",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "users.delete"));
+    options.AddPolicy("CanViewAnonymised",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "reports.anonymised.view"));
+    options.AddPolicy("CanViewNonAnonymised",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "reports.nonanonymised.view"));
+    options.AddPolicy("CanEditAnonymised",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "reports.anonymised.edit"));
+    options.AddPolicy("CanEditNonAnonymised",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "reports.nonanonymised.edit"));
+    options.AddPolicy("CanDownload",
+        p => p.RequireClaim(PermissionClaimsTransformation.PermissionClaimType, "reports.download"));
+});
+
+// Claims transformation — enriches JWT principal with permission claims from DB
+builder.Services.AddScoped<IClaimsTransformation, PermissionClaimsTransformation>();
 
 // ══════════════════════════════════════════════════════════════════════
 //  DATABASE
