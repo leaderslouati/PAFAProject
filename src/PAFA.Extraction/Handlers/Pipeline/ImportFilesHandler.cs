@@ -19,24 +19,23 @@ namespace PAFA.Extraction.Handlers.Pipeline;
 /// </summary>
 public sealed class ImportFilesHandler : IRequestHandler<ImportFilesCommand, ImportFilesResult>
 {
-    private static readonly string[] AllowedPrefixes =
-        ["MOD520A", "RPT_1364", "MOD700", "EUC09", "TRANSFER", "CLASS4AQ"];
-    private static readonly string[] AllowedExtensions = [".xlsx", ".xls"];
-
     private readonly IRemoteFileSource _remoteSource;
     private readonly IBlobStorageService _blobService;
     private readonly IIngestionFileRepository _fileRepo;
     private readonly ILogger<ImportFilesHandler> _log;
+    private readonly IFileSourceSettings _fileSettings;
 
     public ImportFilesHandler(
         IRemoteFileSource remoteSource,
         IBlobStorageService blobService,
         IIngestionFileRepository fileRepo,
+        IFileSourceSettings fileSettings,
         ILogger<ImportFilesHandler> log)
     {
         _remoteSource = remoteSource;
         _blobService  = blobService;
         _fileRepo     = fileRepo;
+        _fileSettings = fileSettings;
         _log          = log;
     }
 
@@ -126,7 +125,7 @@ public sealed class ImportFilesHandler : IRequestHandler<ImportFilesCommand, Imp
 
             // ── File name validation ───────────────────────────────────────
             var nameResult = FileNameValidator.Validate(
-                remoteFile.FileName, AllowedPrefixes, AllowedExtensions);
+                remoteFile.FileName, _fileSettings.AllowedFilePrefixes, _fileSettings.AllowedExtensions);
 
             if (!nameResult.IsValid)
             {

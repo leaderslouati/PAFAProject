@@ -1,52 +1,99 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.Graph.Models;
 using PAFA.Domain.Entities;
 
-namespace PAFA.Infrastructure.Persistence.Configurations;
+namespace PAFA.Infrastructure.EntityConfigurations;
 
 public class MetricValueConfiguration : IEntityTypeConfiguration<MetricValue>
 {
-    public void Configure(EntityTypeBuilder<MetricValue> entity)
+    public void Configure(EntityTypeBuilder<MetricValue> builder)
     {
-        entity.ToTable("metric_values");
+        builder.ToTable("metric_values");
+        builder.HasKey(x => x.Id);
 
-        entity.HasKey(e => e.Id);
+        builder.Property(x => x.Id)
+               .HasColumnName("id")
+               .HasDefaultValueSql("gen_random_uuid()");
 
-        entity.Property(e => e.ShipperShortCode)
-              .IsRequired()
-              .HasMaxLength(20);
+        builder.Property(x => x.ReportingPeriod)
+               .HasColumnName("reporting_period")
+               .HasColumnType("date")
+               .IsRequired();
 
-        entity.Property(e => e.MetricKey)
-              .IsRequired()
-              .HasMaxLength(50);
+        builder.Property(x => x.ShipperId)
+               .HasColumnName("shipper_id");
 
-        entity.Property(e => e.Value)
-              .HasColumnType("numeric(18,6)");
+        builder.Property(x => x.ShipperShortCode)
+               .HasColumnName("shipper_short_code")
+               .HasMaxLength(50)
+               .IsRequired();
 
-        entity.Property(e => e.ProductClassCode)
-              .HasMaxLength(10);
+        builder.Property(x => x.MetricKey)
+               .HasColumnName("metric_key")
+               .HasMaxLength(50)
+               .IsRequired();
 
-        // FK nullable vers Shipper (transition : ShipperShortCode → ShipperId)
-        entity.Property(e => e.ShipperId)
-              .IsRequired(false);
+        builder.Property(x => x.Value)
+               .HasColumnName("value")
+               .HasColumnType("numeric(18,6)");
 
-        entity.HasIndex(e => e.ShipperId)
-              .HasDatabaseName("IX_metric_values_ShipperId");
+        builder.Property(x => x.TextValue)
+               .HasColumnName("text_value");
 
-        entity.HasOne(e => e.Shipper)
-              .WithMany(s => s.MetricValues)
-              .HasForeignKey(e => e.ShipperId)
-              .OnDelete(DeleteBehavior.SetNull)
-              .IsRequired(false);
+        builder.Property(x => x.ProductClassCode)
+               .HasColumnName("product_class_code")
+               .HasMaxLength(10);
 
-        entity.HasOne(e => e.IngestionFile)
-              .WithMany(f => f.MetricValues)
-              .HasForeignKey(e => e.IngestionFileId)
-              .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(x => x.IngestionFileId)
+               .HasColumnName("ingestion_file_id")
+               .IsRequired();
 
-        // Index de performance pour les requêtes par période/shipper/metric
-        entity.HasIndex(e => new { e.ReportingPeriod, e.ShipperShortCode, e.MetricKey })
-              .HasDatabaseName("IX_metric_values_Period_Shipper_MetricKey");
+        builder.Property(x => x.CreatedAt)
+               .HasColumnName("created_at")
+               .HasDefaultValueSql("now()");
+
+        builder.Property(x => x.CreatedBy)
+               .HasColumnName("created_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.UpdatedAt)
+               .HasColumnName("updated_at");
+
+        builder.Property(x => x.UpdatedBy)
+               .HasColumnName("updated_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.IsDeleted)
+               .HasColumnName("is_deleted")
+               .HasDefaultValue(false);
+
+        builder.Property(x => x.RowVersion)
+               .HasColumnName("row_version")
+               .IsConcurrencyToken()
+               .IsRequired(false);
+
+        builder.HasIndex(x => x.ShipperId)
+               .HasDatabaseName("ix_metric_values_shipper_id");
+
+        builder.HasIndex(x => new { x.ReportingPeriod, x.ShipperShortCode, x.MetricKey })
+               .HasDatabaseName("ix_metric_values_period_shipper_key");
+
+        builder.HasIndex(x => x.ReportingPeriod)
+               .HasDatabaseName("ix_metric_values_period");
+
+        builder.HasIndex(x => x.MetricKey)
+               .HasDatabaseName("ix_metric_values_key");
+
+        // FK Relationships
+        builder.HasOne(x => x.Shipper)
+               .WithMany(x => x.MetricValues)
+               .HasForeignKey(x => x.ShipperId)
+               .OnDelete(DeleteBehavior.SetNull)
+               .IsRequired(false);
+
+        builder.HasOne(x => x.IngestionFile)
+               .WithMany(x => x.MetricValues)
+               .HasForeignKey(x => x.IngestionFileId)
+               .OnDelete(DeleteBehavior.Cascade);
     }
 }

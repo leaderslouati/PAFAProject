@@ -5,8 +5,11 @@ namespace PAFA.Infrastructure.Parsing;
 
 public sealed class ExcelFileParser : IFileParser
 {
-    public bool CanHandle(string fileExtension)
-        => fileExtension.ToLowerInvariant() is ".xlsx" or ".xls";
+    public bool CanHandle(string fileName)
+    {
+        var ext = Path.GetExtension(fileName)?.ToLowerInvariant() ?? string.Empty;
+        return ext is ".xlsx" or ".xls";
+    }
 
     public Task<FileParseResult> ParseAsync(
         Stream fileStream,

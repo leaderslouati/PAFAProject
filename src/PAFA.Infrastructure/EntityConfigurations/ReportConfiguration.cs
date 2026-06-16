@@ -1,75 +1,135 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
+using PAFA.Domain.Enums;
 using Report = PAFA.Domain.Entities.Report;
 
 namespace PAFA.Infrastructure.EntityConfigurations;
 
 public class ReportConfiguration : IEntityTypeConfiguration<Report>
 {
-    public void Configure(EntityTypeBuilder<Report> entity)
+    public void Configure(EntityTypeBuilder<Report> builder)
     {
-        entity.ToTable("reports");
-        entity.HasKey(e => e.Id);
+        builder.ToTable("reports");
+        builder.HasKey(x => x.Id);
 
-        entity.Property(e => e.Title)
-              .IsRequired()
-              .HasMaxLength(500);
+        builder.Property(x => x.Id)
+               .HasColumnName("id")
+               .HasDefaultValueSql("gen_random_uuid()");
 
-        entity.Property(e => e.ObservationsText)
-              .HasColumnType("text")
-              .HasComment("Observations mensuelles saisies manuellement par l'analyste PAFA.");
+        builder.Property(x => x.ReportTypeId)
+               .HasColumnName("report_type_id")
+               .IsRequired();
 
-        entity.Property(e => e.ObservationsBy)
-              .HasMaxLength(256)
-              .HasComment("Identifiant (UPN/email) de l'analyste.");
+        builder.Property(x => x.ScheduleNumber)
+               .HasColumnName("schedule_number")
+               .IsRequired();
 
-        entity.Property(e => e.ObservationsUpdatedAt)
-              .HasComment("Horodatage UTC de la dernière mise à jour des observations.");
+        builder.Property(x => x.Title)
+               .HasColumnName("title")
+               .HasMaxLength(500)
+               .IsRequired();
 
-        entity.Property(e => e.IngestionJobId)
-              .IsRequired(false);
+        builder.Property(x => x.ReportingPeriod)
+               .HasColumnName("reporting_period")
+               .HasColumnType("date")
+               .IsRequired();
 
-        entity.HasOne(e => e.ReportType)
-              .WithMany(rt => rt.Reports)
-              .HasForeignKey(e => e.ReportTypeId)
-              .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(x => x.Audience)
+               .HasColumnName("audience")
+               .HasConversion<string>()
+               .HasMaxLength(20);
 
-        entity.HasOne(e => e.IngestionJob)
-              .WithMany()
-              .HasForeignKey(e => e.IngestionJobId)
-              .OnDelete(DeleteBehavior.SetNull)
-              .IsRequired(false);
+        builder.Property(x => x.Status)
+               .HasColumnName("status")
+               .HasConversion<string>()
+               .HasMaxLength(30)
+               .HasDefaultValue("Pending");
 
-        entity.Property(e => e.Status)
-              .HasConversion<int>()          
-              .HasColumnType("integer");
-        
-        entity.Property(e => e.Audience)
-              .HasConversion<int>()        
-              .HasColumnType("integer");
-        entity.Property(e => e.CommentaryText)
-      .HasColumnType("text");
+        builder.Property(x => x.GeneratedAt)
+               .HasColumnName("generated_at");
 
-        entity.Property(e => e.CommentaryBy)
-              .HasMaxLength(200);
+        builder.Property(x => x.PublishedAt)
+               .HasColumnName("published_at");
 
-        entity.Property(e => e.CreatedBy)
-              .HasMaxLength(100);
+        builder.Property(x => x.FilePath_PDF)
+               .HasColumnName("file_path_pdf")
+               .HasMaxLength(1000);
 
-        entity.Property(e => e.UpdatedBy)
-              .HasMaxLength(100);
+        builder.Property(x => x.FilePath_Excel)
+               .HasColumnName("file_path_excel")
+               .HasMaxLength(1000);
 
-        entity.Property(e => e.FilePath_PDF)
-              .HasMaxLength(1000);
+        builder.Property(x => x.FilePath_PPTX)
+               .HasColumnName("file_path_pptx")
+               .HasMaxLength(1000);
 
-        entity.Property(e => e.FilePath_Excel)
-              .HasMaxLength(1000);
+        builder.Property(x => x.CommentaryText)
+               .HasColumnName("commentary_text");
 
-        entity.Property(e => e.FilePath_PPTX)
-              .HasMaxLength(1000);
+        builder.Property(x => x.CommentaryBy)
+               .HasColumnName("commentary_by")
+               .HasMaxLength(200);
 
-        // Index pour requêtes par période de reporting
-        entity.HasIndex(e => new { e.ReportingPeriod, e.ReportTypeId })
-              .HasDatabaseName("IX_reports_Period_Type");
+        builder.Property(x => x.ObservationsText)
+               .HasColumnName("observations_text");
+
+        builder.Property(x => x.ObservationsBy)
+               .HasColumnName("observations_by")
+               .HasMaxLength(256);
+
+        builder.Property(x => x.ObservationsUpdatedAt)
+               .HasColumnName("observations_updated_at");
+
+        builder.Property(x => x.IngestionJobId)
+               .HasColumnName("ingestion_job_id");
+
+        builder.Property(x => x.IsBaseline)
+               .HasColumnName("is_baseline")
+               .HasDefaultValue(false);
+
+        builder.Property(x => x.CreatedAt)
+               .HasColumnName("created_at")
+               .HasDefaultValueSql("now()");
+
+        builder.Property(x => x.CreatedBy)
+               .HasColumnName("created_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.UpdatedAt)
+               .HasColumnName("updated_at");
+
+        builder.Property(x => x.UpdatedBy)
+               .HasColumnName("updated_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.IsDeleted)
+               .HasColumnName("is_deleted")
+               .HasDefaultValue(false);
+
+        builder.Property(x => x.RowVersion)
+               .HasColumnName("row_version")
+               .IsConcurrencyToken()
+               .IsRequired(false);
+
+        builder.HasIndex(x => new { x.ReportingPeriod, x.ReportTypeId })
+               .HasDatabaseName("ix_reports_period_type");
+
+        builder.HasIndex(x => x.Status)
+               .HasDatabaseName("ix_reports_status");
+
+        builder.HasIndex(x => x.Audience)
+               .HasDatabaseName("ix_reports_audience");
+
+        // FK Relationships
+        builder.HasOne(x => x.ReportType)
+               .WithMany(x => x.Reports)
+               .HasForeignKey(x => x.ReportTypeId)
+               .OnDelete(DeleteBehavior.Restrict);
+
+        builder.HasOne(x => x.IngestionJob)
+               .WithMany()
+               .HasForeignKey(x => x.IngestionJobId)
+               .OnDelete(DeleteBehavior.SetNull)
+               .IsRequired(false);
     }
 }

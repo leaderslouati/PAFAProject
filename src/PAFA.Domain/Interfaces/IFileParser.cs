@@ -1,17 +1,17 @@
 namespace PAFA.Domain.Interfaces;
 
 /// <summary>
-/// Représente une ligne brute extraite du fichier source.
-/// Tous les champs sont des strings — la conversion de types
+/// Reprï¿½sente une ligne brute extraite du fichier source.
+/// Tous les champs sont des strings ï¿½ la conversion de types
 /// se fait dans le mapper (couche Application).
 /// </summary>
 public record RawDataRow
 {
-    /// <summary>Numéro de ligne original (base 1) dans le fichier.</summary>
+    /// <summary>Numï¿½ro de ligne original (base 1) dans le fichier.</summary>
     public int RowNumber { get; init; }
 
     /// <summary>
-    /// Toutes les valeurs indexées par nom de colonne normalisé
+    /// Toutes les valeurs indexï¿½es par nom de colonne normalisï¿½
     /// (minuscules, sans espaces).
     /// Ex: { "shippershortcode": "ABN", "reportingperiod": "Feb-25" }
     /// </summary>
@@ -21,7 +21,7 @@ public record RawDataRow
     public string SheetName { get; init; } = string.Empty;
 }
 
-/// <summary>Résultat complet du parsing d'un fichier.</summary>
+/// <summary>Rï¿½sultat complet du parsing d'un fichier.</summary>
 public record FileParseResult
 {
     public bool Success { get; init; }
@@ -36,20 +36,20 @@ public record FileParseResult
 
 /// <summary>
 /// Contrat de parsing de fichier.
-/// Implémenter pour chaque format (Excel, XML, CSV).
-/// Enregistrer toutes les implémentations dans DI —
-/// la factory résout par extension.
-/// Défini dans Domain pour respecter la Clean Architecture :
-/// Extraction ne doit pas dépendre d'Infrastructure.
+/// Implï¿½menter pour chaque format (Excel, XML, CSV).
+/// Enregistrer toutes les implï¿½mentations dans DI ï¿½
+/// la factory rï¿½sout par extension.
+/// Dï¿½fini dans Domain pour respecter la Clean Architecture :
+/// Extraction ne doit pas dï¿½pendre d'Infrastructure.
 /// </summary>
 public interface IFileParser
 {
-    /// <summary>Retourne true si ce parser gère cette extension.</summary>
-    bool CanHandle(string fileExtension);
+    /// <summary>Retourne true si ce parser peut traiter ce fichier (nom complet).</summary>
+    bool CanHandle(string fileName);
 
     /// <summary>
     /// Parse le stream et retourne les lignes brutes.
-    /// NE fait PAS de validation métier — extraction structurelle uniquement.
+    /// NE fait PAS de validation mï¿½tier ï¿½ extraction structurelle uniquement.
     /// </summary>
     Task<FileParseResult> ParseAsync(
         Stream fileStream,

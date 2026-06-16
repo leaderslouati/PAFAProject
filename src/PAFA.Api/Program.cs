@@ -230,6 +230,12 @@ else
 builder.Services.AddScoped<IFileParser, ExcelFileParser>();
 builder.Services.AddScoped<IFileParser, CsvFileParser>();
 builder.Services.AddScoped<IFileParser, XmlFileParser>();
+builder.Services.AddScoped<IFileParser, Mod520aParser>();
+builder.Services.AddScoped<IFileParser, FlatLongParser>();
+builder.Services.AddScoped<IFileParser, MultiAxisParser>();
+builder.Services.AddScoped<IFileParser, MatrixReportParser>();
+builder.Services.AddScoped<IFileParser, CorrectiveOpeningParser>();
+builder.Services.AddScoped<IFileParser, EnergyTheftParser>();
 builder.Services.AddScoped<FileParserFactory>();
 
 // ═══════════════════════════════════════════════════════════════════════

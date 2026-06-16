@@ -14,14 +14,14 @@ public  class FileParserFactory
         => _parsers = parsers;
 
     /// <summary>
-    /// Returns the parser that can handle the given file extension.
-    /// Throws if no parser is registered for that extension.
+    /// Returns the first parser that declares it can handle the given file.
+    /// Parsers may decide based on file name (prefix) or extension.
+    /// Throws if no parser is registered for the file.
     /// </summary>
     public IFileParser GetParser(string fileName)
     {
-        var ext = Path.GetExtension(fileName);
-        return _parsers.FirstOrDefault(p => p.CanHandle(ext))
+        return _parsers.FirstOrDefault(p => p.CanHandle(fileName))
             ?? throw new NotSupportedException(
-                $"No parser registered for extension '{ext}'. File: {fileName}");
+                $"No parser registered for file '{fileName}'.");
     }
 }

@@ -7,8 +7,8 @@ namespace PAFA.Infrastructure.Parsing;
 
 public sealed class CsvFileParser : IFileParser
 {
-    public bool CanHandle(string fileExtension)
-        => fileExtension.ToLowerInvariant() is ".csv";
+    public bool CanHandle(string fileName)
+        => (Path.GetExtension(fileName) ?? string.Empty).ToLowerInvariant() is ".csv";
 
     public async Task<FileParseResult> ParseAsync(
         Stream fileStream,

@@ -1,14 +1,31 @@
-# 📚 DOCUMENTATION INDEX — PAFA Reports 2A & 2B Implementation
+# 📚 Index des Documents — PAFA Export & Reporting Implementation
 
-> Complete Navigation Guide — All Resources Centralized
+**Generated:** 2026-06-14  
+**Purpose:** Navigate all implementation documents and find what you need
 
 ---
 
-## 🎯 START HERE
+## 🎯 Commencer ici
 
-### For Executives / Project Managers
-👉 **Start:** [`EXECUTIVE_SUMMARY.md`](EXECUTIVE_SUMMARY.md)  
-**Contains:** Overview, objectives, timeline, success criteria, impact metrics
+### Pour une implémentation rapide (2-3h)
+👉 **Fichier:** [QUICK_START_IMPLEMENTATION.md](QUICK_START_IMPLEMENTATION.md)
+- 7 étapes pratiques & chronométrées
+- Copier-coller commands
+- Checklist validations
+- Durée totale: 2-3 heures
+
+### Pour une implémentation complète (avec architecture)
+👉 **Fichier:** [EXPORT_REPORTS_COMPLETE_GUIDE.md](EXPORT_REPORTS_COMPLETE_GUIDE.md)
+- Architecture générale (diagrammes)
+- Prérequis détaillés
+- Code C# complet (PowerBiExportService)
+- Automatisation & dépannage
+
+### Pour valider ce qui a été livré
+👉 **Fichier:** [IMPLEMENTATION_SUMMARY.md](IMPLEMENTATION_SUMMARY.md)
+- Récapitulatif 9 artefacts
+- Checklist déploiement
+- Matrix responsabilité
 
 ---
 

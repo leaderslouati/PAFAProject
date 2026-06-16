@@ -1,45 +1,67 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
-using Microsoft.Graph.Models;
-using PAFA.Domain.Entities;
 using PAFA.Domain.Entities.Referential;
 
 namespace PAFA.Infrastructure.EntityConfigurations;
 
 public class ShipperProductClassConfiguration : IEntityTypeConfiguration<ShipperProductClass>
 {
-    public void Configure(EntityTypeBuilder<ShipperProductClass> entity)
+    public void Configure(EntityTypeBuilder<ShipperProductClass> builder)
     {
-        entity.ToTable("shipper_product_classes");
-        // Clé composite : ShipperId + ProductClassId + ReportingPeriod
-        entity.HasKey(e => new { e.ShipperId, e.ProductClassId, e.ReportingPeriod });
+        builder.ToTable("shipper_product_classes");
+  
+        builder.Property(x => x.ShipperId)
+               .HasColumnName("shipper_id")
+               .IsRequired();
 
-        entity.Property(e => e.EstimatedPct)
-              .HasColumnType("numeric(8,4)")
-              .HasComment("% lectures estimées (0-100). Source: MetricKey='EstimatedPct'.");
+        builder.Property(x => x.ProductClassId)
+               .HasColumnName("product_class_id")
+               .IsRequired();
 
-        entity.Property(e => e.CheckReadCountNotCompleted)
-              .HasComment("Nb check reads non complétés. >= 0.");
 
-        entity.Property(e => e.ReadPerfPct)
-              .HasColumnType("numeric(8,4)")
-              .HasComment("% global de performance lecture (0-100).");
+        builder.Property(x => x.CreatedAt)
+               .HasColumnName("created_at")
+               .HasDefaultValueSql("now()");
 
-        entity.Property(e => e.NoMeterCount)
-              .HasComment("Nb SP sans meter enregistré. >= 0.");
+        builder.Property(x => x.CreatedBy)
+               .HasColumnName("created_by")
+               .HasMaxLength(100);
 
-        entity.Property(e => e.NoMeterPct)
-              .HasColumnType("numeric(8,4)")
-              .HasComment("% SP sans meter. PC1/PC2 = 0.");
+        builder.Property(x => x.UpdatedAt)
+               .HasColumnName("updated_at");
 
-        entity.HasOne(e => e.Shipper)
-              .WithMany(s => s.ProductClasses)
-              .HasForeignKey(e => e.ShipperId)
-              .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(x => x.UpdatedBy)
+               .HasColumnName("updated_by")
+               .HasMaxLength(100);
 
-        entity.HasOne(e => e.ProductClass)
-              .WithMany(pc => pc.ShipperProductClasses)
-              .HasForeignKey(e => e.ProductClassId)
-              .OnDelete(DeleteBehavior.Restrict);
+        builder.Property(x => x.IsDeleted)
+               .HasColumnName("is_deleted")
+               .HasDefaultValue(false);
+
+        builder.Property(x => x.RowVersion)
+               .HasColumnName("row_version")
+               .IsConcurrencyToken()
+               .IsRequired(false);
+
+        builder.HasIndex(x => x.ShipperId)
+               .HasDatabaseName("ix_spc_shipper_id");
+
+        builder.HasIndex(x => x.ProductClassId)
+               .HasDatabaseName("ix_spc_product_class_id");
+
+        builder.HasIndex(x => new { x.ShipperId, x.ProductClassId })
+               .IsUnique()
+               .HasDatabaseName("ux_spc_shipper_product_class");
+
+        // FK Relationships
+        builder.HasOne(x => x.Shipper)
+               .WithMany(x => x.ProductClasses)
+               .HasForeignKey(x => x.ShipperId)
+               .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasOne(x => x.ProductClass)
+               .WithMany(x => x.ShipperProductClasses)
+               .HasForeignKey(x => x.ProductClassId)
+               .OnDelete(DeleteBehavior.Cascade);
     }
 }

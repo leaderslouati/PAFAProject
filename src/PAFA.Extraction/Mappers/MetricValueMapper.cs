@@ -47,6 +47,40 @@ public static class MetricValueMapper
         { new[]{"igtknownissuecount"},                                     "igt_known_issue_count"  },
         { new[]{"comrrejections"},                                         "comr_rejections"        },
         { new[]{"class4vacantsites"},                                      "class4_vacant_sites"    },
+        { new[]{"no_meter_pct","nometerflowpct"},                  "no_meter_pct"                  },
+        { new[]{"transfer_read_total","transfertotal"},             "transfer_read_total"            },
+        { new[]{"mre01026pct"},                                    "mre01026_pct"                  },
+        { new[]{"mre01027pct"},                                    "mre01027_pct"                  },
+        { new[]{"mre01028pct"},                                    "mre01028_pct"                  },
+        { new[]{"mre01029pct"},                                    "mre01029_pct"                  },
+        { new[]{"mre01030pct"},                                    "mre01030_pct"                  },
+        { new[]{"aqcorrectionreason01"},                           "aq_correction_reason_01"        },
+        // ... (01 à 09)
+        { new[]{"class1abovethreshcount"},                         "class1_above_thresh_count"      },
+        { new[]{"class1abovethreshaqgwh"},                         "class1_above_thresh_aq_gwh"     },
+        { new[]{"class1reclassifiedcount"},                        "class1_reclassified_count"      },
+        { new[]{"aqreadperf293kpct"},                              "aq_read_perf_monthly_293k_pct"  },
+        { new[]{"aqreadperfsmtpct"},                               "aq_read_perf_smart_amr_pct"     },
+        { new[]{"aqreadperfannualpct"},                            "aq_read_perf_annual_pct"        },
+        { new[]{"aqatriskgwh"},                                    "aq_at_risk_gwh"                 },
+        { new[]{"aqatriskpct"},                                    "aq_at_risk_pct"                 },
+        { new[]{"theftclaimpct"},                                  "theft_claim_obj_pct"            },
+        { new[]{"theftenergypct"},                                 "theft_claim_energy_pct"         },
+        { new[]{"theftwdpct"},                                     "theft_wd_obj_pct"               },
+        { new[]{"class3convcountpc"},                              "class3_conv_count"              },
+        { new[]{"class3convaqgwh"},                                "class3_conv_aq_gwh"             },
+        { new[]{"class3convpct"},                                  "class3_conv_pct"                },
+        { new[]{"minpctreqpct"},                                   "min_pct_req_pct"                },
+        { new[]{"minpctnotmetcount"},                              "min_pct_not_met_count"          },
+        { new[]{"mprnremovedpct"},                                 "mprn_removed_pct"               },
+        { new[]{"mustreadagepct"},                                 "must_read_age_pct"              },
+        { new[]{"mprnenteringcount"},                              "mprn_entering_count"            },
+        { new[]{"comrcount"},                                      "comr_count"                     },
+        { new[]{"comrrejectrecvpct"},                              "comr_reject_recv_pct"           },
+        { new[]{"comrrejectraisedpct"},                            "comr_reject_raised_pct"         },
+        { new[]{"vacantinmonthcount"},                             "vacant_in_month_count"          },
+        { new[]{"vacanteodcount"},                                 "vacant_eod_count"               },
+        { new[]{"vacantproportionpct"},                            "vacant_proportion_age_pct"      },
     };
 
     /// <summary>
@@ -60,14 +94,27 @@ public static class MetricValueMapper
         string uploadedBy = "SYSTEM")
     {
         var ssc = GetCell(row, "shippershortcode", "ssc", "code") ?? string.Empty;
+        var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
+        // First pass: use aliases defined in MetricColumns, or directly the canonical metricKey if parser used it as cell key
         foreach (var (aliases, metricKey) in MetricColumns)
         {
-            var raw = GetCell(row, aliases);
+            string? raw = GetCell(row, aliases);
+            if (raw is null)
+            {
+                // Some parsers may write the canonical metric key as the column name
+                if (row.Cells.TryGetValue(metricKey, out var v) && !string.IsNullOrWhiteSpace(v))
+                    raw = v;
+            }
             if (raw is null) continue;
 
             var value = ParseDecimal(raw);
             if (value is null) continue;
+
+            emitted.Add(metricKey);
+
+            var productClassCell = GetCell(row, "productclass", "product_class", "pc");
+            var productClass = NormalizeProductClass(productClassCell);
 
             yield return new MetricValue
             {
@@ -76,9 +123,42 @@ public static class MetricValueMapper
                 ShipperShortCode = ssc,
                 MetricKey = metricKey,
                 Value = value.Value,
+                ProductClassCode = productClass,
                 ReportingPeriod = reportingPeriod,
                 CreatedBy = uploadedBy
             };
+        }
+
+        // Second pass: any remaining cells that look like canonical metric keys but weren't covered in MetricColumns
+        var knownMetricKeys = new HashSet<string>(MetricColumns.Values, StringComparer.OrdinalIgnoreCase);
+        foreach (var kv in row.Cells)
+        {
+            var key = kv.Key;
+            if (string.IsNullOrWhiteSpace(key)) continue;
+            if (string.Equals(key, "shippershortcode", StringComparison.OrdinalIgnoreCase)) continue;
+            if (emitted.Contains(key)) continue;
+
+            if (knownMetricKeys.Contains(key))
+            {
+                var raw = kv.Value;
+                var value = raw is null ? null : ParseDecimal(raw);
+                if (value is null) continue;
+
+                var productClassCell2 = GetCell(row, "productclass", "product_class", "pc");
+                var productClass2 = NormalizeProductClass(productClassCell2);
+
+                yield return new MetricValue
+                {
+                    Id = Guid.NewGuid(),
+                    IngestionFileId = ingestionFileId,
+                    ShipperShortCode = ssc,
+                    MetricKey = key,
+                    Value = value.Value,
+                    ProductClassCode = productClass2,
+                    ReportingPeriod = reportingPeriod,
+                    CreatedBy = uploadedBy
+                };
+            }
         }
     }
 
@@ -104,5 +184,17 @@ public static class MetricValueMapper
             d *= 100m;
 
         return Math.Round(d, 4);
+    }
+
+    private static string? NormalizeProductClass(string? raw)
+    {
+        if (string.IsNullOrWhiteSpace(raw)) return null;
+        var s = raw.Trim().ToUpperInvariant();
+        if (s == "PC1" || s == "PC2" || s == "PC3" || s == "PC4") return s;
+        if (s.Contains("CLASS 1") || s.Contains("CLASS1") || s.Contains("1")) return "PC1";
+        if (s.Contains("CLASS 2") || s.Contains("CLASS2") || s.Contains("2")) return "PC2";
+        if (s.Contains("CLASS 3") || s.Contains("CLASS3") || s.Contains("3")) return "PC3";
+        if (s.Contains("CLASS 4") || s.Contains("CLASS4") || s.Contains("4")) return "PC4";
+        return null;
     }
 }

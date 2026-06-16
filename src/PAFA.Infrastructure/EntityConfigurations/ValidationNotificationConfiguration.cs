@@ -6,26 +6,86 @@ namespace PAFA.Infrastructure.EntityConfigurations;
 
 public class ValidationNotificationConfiguration : IEntityTypeConfiguration<ValidationNotification>
 {
-    public void Configure(EntityTypeBuilder<ValidationNotification> b)
+    public void Configure(EntityTypeBuilder<ValidationNotification> builder)
     {
-        b.ToTable("validation_notifications");
-        b.HasKey(x => x.Id);
-        b.Property(x => x.Id).HasDefaultValueSql("gen_random_uuid()");
-        b.Property(x => x.FileName).IsRequired().HasMaxLength(500);
-        b.Property(x => x.ReportingPeriod).IsRequired().HasMaxLength(20);
-        b.Property(x => x.SourceSystem).IsRequired().HasMaxLength(20);
-        b.Property(x => x.Recipients).IsRequired().HasMaxLength(2000);
-        b.Property(x => x.Status).IsRequired().HasMaxLength(10);
-        b.Property(x => x.ErrorDetail).HasMaxLength(2000);
-        b.Property(x => x.CreatedBy).HasMaxLength(100);
-        b.Property(x => x.UpdatedBy).HasMaxLength(100);
+        builder.ToTable("validation_notifications");
+        builder.HasKey(x => x.Id);
 
-        b.HasOne(x => x.IngestionFile)
-            .WithMany()
-            .HasForeignKey(x => x.IngestionFileId)
-            .OnDelete(DeleteBehavior.Cascade);
+        builder.Property(x => x.Id)
+               .HasColumnName("id")
+               .HasDefaultValueSql("gen_random_uuid()");
 
-        b.HasIndex(x => x.IngestionFileId).HasDatabaseName("ix_val_notif_file");
-        b.HasIndex(x => x.SentAt).HasDatabaseName("ix_val_notif_sent_at");
+        builder.Property(x => x.IngestionFileId)
+               .HasColumnName("ingestion_file_id")
+               .IsRequired();
+
+        builder.Property(x => x.FileName)
+               .HasColumnName("file_name")
+               .HasMaxLength(500)
+               .IsRequired();
+
+        builder.Property(x => x.ReportingPeriod)
+               .HasColumnName("reporting_period")
+               .HasMaxLength(50)
+               .IsRequired();
+
+        builder.Property(x => x.SourceSystem)
+               .HasColumnName("source_system")
+               .HasMaxLength(20)
+               .IsRequired();
+
+        builder.Property(x => x.Recipients)
+               .HasColumnName("recipients")
+               .HasMaxLength(2000)
+               .IsRequired();
+
+        builder.Property(x => x.TotalErrors)
+               .HasColumnName("total_errors")
+               .IsRequired();
+
+        builder.Property(x => x.SentAt)
+               .HasColumnName("sent_at")
+               .HasDefaultValueSql("now()");
+
+        builder.Property(x => x.Status)
+               .HasColumnName("status")
+               .HasMaxLength(30)
+               .HasDefaultValue("SENT");
+
+        builder.Property(x => x.ErrorDetail)
+               .HasColumnName("error_detail")
+               .HasMaxLength(2000);
+
+        builder.Property(x => x.CreatedAt)
+               .HasColumnName("created_at")
+               .HasDefaultValueSql("now()");
+
+        builder.Property(x => x.CreatedBy)
+               .HasColumnName("created_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.UpdatedAt)
+               .HasColumnName("updated_at");
+
+        builder.Property(x => x.UpdatedBy)
+               .HasColumnName("updated_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.IsDeleted)
+               .HasColumnName("is_deleted")
+               .HasDefaultValue(false);
+
+        builder.Property(x => x.RowVersion)
+               .HasColumnName("row_version")
+               .IsConcurrencyToken()
+               .IsRequired(false);
+
+        builder.HasIndex(x => x.IngestionFileId)
+               .HasDatabaseName("ix_vn_file_id");
+
+        builder.HasIndex(x => x.Status)
+               .HasDatabaseName("ix_vn_status");
+
+        
     }
 }

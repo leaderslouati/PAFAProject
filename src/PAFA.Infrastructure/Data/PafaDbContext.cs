@@ -7,7 +7,6 @@ using PAFA.Domain.Entities;
 using PAFA.Domain.Entities.Authentication;
 using PAFA.Domain.Entities.Referential;
 using PAFA.Infrastructure.EntityConfigurations;
-using PAFA.Infrastructure.Persistence.Configurations;
 
 namespace PAFA.Infrastructure.Persistence;
 

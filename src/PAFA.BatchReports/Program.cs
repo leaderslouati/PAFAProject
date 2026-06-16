@@ -288,6 +288,12 @@ class Program
                 services.AddScoped<IFileParser, ExcelFileParser>();
                 services.AddScoped<IFileParser, CsvFileParser>();
                 services.AddScoped<IFileParser, XmlFileParser>();
+                services.AddScoped<IFileParser, Mod520aParser>();
+                services.AddScoped<IFileParser, FlatLongParser>();
+                services.AddScoped<IFileParser, MultiAxisParser>();
+                services.AddScoped<IFileParser, MatrixReportParser>();
+                services.AddScoped<IFileParser, CorrectiveOpeningParser>();
+                services.AddScoped<IFileParser, EnergyTheftParser>();
                 services.AddScoped<FileParserFactory>();
 
                 services.AddMediatR(cfg =>

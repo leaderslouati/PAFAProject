@@ -8,7 +8,7 @@ namespace PAFA.Infrastructure.Parsing;
 ///
 /// Supporte deux structures XML communes :
 ///
-/// Structure 1 — éléments enfants comme colonnes (format "row-based") :
+/// Structure 1 ï¿½ ï¿½lï¿½ments enfants comme colonnes (format "row-based") :
 ///   &lt;Report&gt;
 ///     &lt;Row&gt;
 ///       &lt;ShipperShortCode&gt;SSE&lt;/ShipperShortCode&gt;
@@ -18,19 +18,19 @@ namespace PAFA.Infrastructure.Parsing;
 ///     &lt;Row&gt; ... &lt;/Row&gt;
 ///   &lt;/Report&gt;
 ///
-/// Structure 2 — attributs comme colonnes (format "attribute-based") :
+/// Structure 2 ï¿½ attributs comme colonnes (format "attribute-based") :
 ///   &lt;Report&gt;
 ///     &lt;Row ShipperShortCode="SSE" ReportingPeriod="Mar-25" ReadPerformancePct="97.82" /&gt;
 ///   &lt;/Report&gt;
 ///
-/// Dans les deux cas, le résultat produit des RawDataRow normalisés
-/// identiques à ceux produits par ExcelFileParser et CsvFileParser.
-/// Le même MetricValueMapper et ImportValidationService s'appliquent sans modification.
+/// Dans les deux cas, le rï¿½sultat produit des RawDataRow normalisï¿½s
+/// identiques ï¿½ ceux produits par ExcelFileParser et CsvFileParser.
+/// Le mï¿½me MetricValueMapper et ImportValidationService s'appliquent sans modification.
 /// </summary>
 public sealed class XmlFileParser : IFileParser
 {
-    public bool CanHandle(string fileExtension)
-        => fileExtension.ToLowerInvariant() is ".xml";
+    public bool CanHandle(string fileName)
+        => (Path.GetExtension(fileName) ?? string.Empty).ToLowerInvariant() is ".xml";
 
     public Task<FileParseResult> ParseAsync(
         Stream fileStream,
@@ -45,17 +45,17 @@ public sealed class XmlFileParser : IFileParser
             if (root is null)
                 return Task.FromResult(Fail(fileName, "Fichier XML vide ou racine manquante."));
 
-            // ?? Détecter les éléments "ligne" ??????????????????????????????
+            // ?? Dï¿½tecter les ï¿½lï¿½ments "ligne" ??????????????????????????????
             // On prend les premiers enfants directs de la racine qui ont
-            // eux-mêmes des enfants ou des attributs — ce sont nos lignes.
+            // eux-mï¿½mes des enfants ou des attributs ï¿½ ce sont nos lignes.
             var rowElements = root.Elements()
                 .Where(e => e.HasElements || e.HasAttributes)
                 .ToList();
 
             if (rowElements.Count == 0)
                 return Task.FromResult(Fail(fileName,
-                    "Aucune ligne de données trouvée dans le XML. " +
-                    "Vérifiez la structure : éléments enfants ou attributs attendus."));
+                    "Aucune ligne de donnï¿½es trouvï¿½e dans le XML. " +
+                    "Vï¿½rifiez la structure : ï¿½lï¿½ments enfants ou attributs attendus."));
 
             var rows = new List<RawDataRow>();
             int rowNumber = 1;
@@ -86,7 +86,7 @@ public sealed class XmlFileParser : IFileParser
                         cells.TryAdd(key, string.IsNullOrWhiteSpace(value) ? null : value);
                 }
 
-                // Ignorer les lignes complètement vides
+                // Ignorer les lignes complï¿½tement vides
                 if (cells.Count == 0 || cells.Values.All(v => string.IsNullOrWhiteSpace(v)))
                     continue;
 
@@ -100,7 +100,7 @@ public sealed class XmlFileParser : IFileParser
 
             if (rows.Count == 0)
                 return Task.FromResult(Fail(fileName,
-                    "Le fichier XML ne contient aucune ligne de données valide."));
+                    "Le fichier XML ne contient aucune ligne de donnï¿½es valide."));
 
             return Task.FromResult(new FileParseResult
             {
@@ -128,7 +128,7 @@ public sealed class XmlFileParser : IFileParser
     // ?? Helpers ????????????????????????????????????????????????????????????
 
     /// <summary>
-    /// Normalise un nom d'élément/attribut XML vers le format attendu par
+    /// Normalise un nom d'ï¿½lï¿½ment/attribut XML vers le format attendu par
     /// MetricValueMapper et ImportValidationService.
     /// Ex: "ShipperShortCode" ? "shippershortcode"
     ///     "Read_Performance_Pct" ? "readperformancepct"

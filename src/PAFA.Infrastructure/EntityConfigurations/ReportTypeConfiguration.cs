@@ -3,25 +3,82 @@ using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PAFA.Domain.Entities;
 using PAFA.Domain.Enums;
 
-namespace PAFA.Infrastructure.EntityConfigurations;  
+namespace PAFA.Infrastructure.EntityConfigurations;
 
 public class ReportTypeConfiguration : IEntityTypeConfiguration<ReportType>
 {
-    public void Configure(EntityTypeBuilder<ReportType> b)
+    public void Configure(EntityTypeBuilder<ReportType> builder)
     {
-        b.ToTable("report_types");
-        b.HasKey(x => x.Id);
-        b.Property(x => x.Id).ValueGeneratedNever();
-        b.Property(x => x.Code).IsRequired().HasMaxLength(10);
-        b.HasIndex(x => x.Code).IsUnique().HasDatabaseName("ix_reporttype_code");
-        b.Property(x => x.ScheduleRef).HasMaxLength(20);
-        b.Property(x => x.Label).HasMaxLength(200);
-        b.Property(x => x.Audience).HasConversion<string>().HasMaxLength(20);
-        b.Property(x => x.CreatedBy).HasMaxLength(100);
-        b.Property(x => x.UpdatedBy).HasMaxLength(100);
-        b.Property(x => x.RowVersion).IsConcurrencyToken().IsRequired(false);
+        builder.ToTable("report_types");
+        builder.HasKey(x => x.Id);
 
-        b.HasData(
+        builder.Property(x => x.Id)
+               .HasColumnName("id")
+               .ValueGeneratedNever();
+
+        builder.Property(x => x.Code)
+               .HasColumnName("code")
+               .HasMaxLength(10)
+               .IsRequired();
+
+        builder.Property(x => x.ScheduleRef)
+               .HasColumnName("schedule_ref")
+               .HasMaxLength(20);
+
+        builder.Property(x => x.Label)
+               .HasColumnName("label")
+               .HasMaxLength(200)
+               .IsRequired();
+
+        builder.Property(x => x.Audience)
+               .HasColumnName("audience")
+               .HasConversion<string>()
+               .HasMaxLength(20);
+
+        builder.Property(x => x.ReportCount)
+               .HasColumnName("report_count")
+               .HasDefaultValue(0);
+
+        builder.Property(x => x.IsActive)
+               .HasColumnName("is_active")
+               .HasDefaultValue(true);
+
+        builder.Property(x => x.CreatedAt)
+               .HasColumnName("created_at")
+               .HasDefaultValueSql("now()");
+
+        builder.Property(x => x.CreatedBy)
+               .HasColumnName("created_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.UpdatedAt)
+               .HasColumnName("updated_at");
+
+        builder.Property(x => x.UpdatedBy)
+               .HasColumnName("updated_by")
+               .HasMaxLength(100);
+
+        builder.Property(x => x.IsDeleted)
+               .HasColumnName("is_deleted")
+               .HasDefaultValue(false);
+
+        builder.Property(x => x.RowVersion)
+               .HasColumnName("row_version")
+               .IsConcurrencyToken()
+               .IsRequired(false);
+
+        builder.HasIndex(x => x.Code)
+               .IsUnique()
+               .HasDatabaseName("ix_reporttype_code");
+
+        // Relationships
+        builder.HasMany(x => x.Reports)
+               .WithOne(x => x.ReportType)
+               .HasForeignKey(x => x.ReportTypeId)
+               .OnDelete(DeleteBehavior.Restrict);
+
+        // Seed Data
+        builder.HasData(
             new ReportType
             {
                 Id = 1,
