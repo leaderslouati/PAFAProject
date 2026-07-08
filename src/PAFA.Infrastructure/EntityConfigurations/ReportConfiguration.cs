@@ -34,16 +34,17 @@ public class ReportConfiguration : IEntityTypeConfiguration<Report>
                .HasColumnType("date")
                .IsRequired();
 
-        builder.Property(x => x.Audience)
-               .HasColumnName("audience")
-               .HasConversion<string>()
-               .HasMaxLength(20);
-
         builder.Property(x => x.Status)
                .HasColumnName("status")
                .HasConversion<string>()
                .HasMaxLength(30)
-               .HasDefaultValue("Pending");
+               .HasDefaultValue(ReportStatus.Pending); // Enum
+
+        builder.Property(x => x.Audience)
+               .HasColumnName("audience")
+               .HasConversion<string>()
+               .HasMaxLength(20)
+               .HasDefaultValue(ReportAudience.Industry); // Enum
 
         builder.Property(x => x.GeneratedAt)
                .HasColumnName("generated_at");

@@ -86,15 +86,54 @@ public static class MetricValueMapper
     /// <summary>
     /// Mappe un RawDataRow → liste de MetricValue (une par colonne numérique trouvée).
     /// Les colonnes absentes ou non-numériques sont ignorées silencieusement.
+    ///
+    /// Comment se fait le remplissage en base :
+    ///   PersistFilesHandler (Step 3) télécharge le fichier Blob, appelle ExcelInspectionService,
+    ///   construit les RawDataRow puis appelle cette méthode pour chaque ligne.
+    ///   Le résultat est inséré dans la table metric_values via IUnitOfWork.MetricValues.AddRangeAsync().
+    ///   Les vues SQL (vw_2a*, vw_2b*) lisent ensuite metric_values filtrées par report_code.
+    ///
+    /// Flux complet :
+    ///   SharePoint XLSX → Blob /inbound/ → ExcelInspectionService → RawDataRow
+    ///   → MapToMetricValues (ici) → metric_values (DB) → vues SQL → Power BI Report Builder
+    ///
+    /// Mapping fichier → report_code (source officielle : Files/PARR Reports - Mapping.xlsx) :
+    ///   MOD520A__PAF_Reports_*.xlsx → 2A.1-2A.10 et 2B.1-2B.10  (déterminé par onglet)
+    ///   EUC09_Reporting_PAC_*.xlsx  → 2A.11a, 2A.11b, 2B.14a, 2B.14b
+    ///   Rpt_1364_PARR AQ*.xlsx      → 2B.11a à 2B.11h
+    ///   AQ at Risk*.xlsx            → 2A.13, 2B.16
+    ///   Read Performance by Shipper → 2A.12a/b/c, 2B.15a/b/c
+    ///   Confirmed Energy Theft*.xlsx → 2A.14, 2B.17
+    ///   Supply Points Reclassified  → 2A.15, 2B.18
+    ///   Supply Points Min Threshold → 2A.16, 2B.19
+    ///   Report 1A/1B (Vacant)       → 2A.19, 2B.22
+    ///   Report 1/2/3 (MPRN)         → 2A.17, 2B.20
+    ///   2B.21 Corrective (COMR)     → 2A.18, 2B.21
     /// </summary>
+    /// <param name="row">Ligne brute Excel avec Cells normalisés et SheetName renseigné.</param>
+    /// <param name="ingestionFileId">FK vers ingestion_files — traçabilité obligatoire.</param>
+    /// <param name="reportingPeriod">Premier jour du mois de reporting.</param>
+    /// <param name="sourceFileName">
+    ///   Nom du fichier Excel source (ex: "MOD520A__PAF_Reports_Apr26_Non Anonymised.xlsx").
+    ///   Utilisé par ReportCodeResolver pour déterminer report_code et euc_code.
+    ///   Passé depuis PersistFilesHandler via result.FileName.
+    /// </param>
+    /// <param name="uploadedBy">Identifiant de l'auteur de l'import (par défaut "SYSTEM").</param>
     public static IEnumerable<MetricValue> MapToMetricValues(
         RawDataRow row,
         Guid ingestionFileId,
         DateOnly reportingPeriod,
+        string sourceFileName,
         string uploadedBy = "SYSTEM")
     {
         var ssc = GetCell(row, "shippershortcode", "ssc", "code") ?? string.Empty;
         var emitted = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        // ── Résolution du ReportCode et EucCode ─────────────────────────────
+        // ReportCodeResolver détermine le code PARR ("2A.1", "2B.11a", etc.) en
+        // combinant le préfixe du nom de fichier et le nom de l'onglet Excel.
+        var reportCode = ReportCodeResolver.Resolve(sourceFileName, row.SheetName);
+        var eucCode    = GetCell(row, "euccode", "euc", "eucband", "band");
 
         // First pass: use aliases defined in MetricColumns, or directly the canonical metricKey if parser used it as cell key
         foreach (var (aliases, metricKey) in MetricColumns)
@@ -118,14 +157,16 @@ public static class MetricValueMapper
 
             yield return new MetricValue
             {
-                Id = Guid.NewGuid(),
-                IngestionFileId = ingestionFileId,
+                Id               = Guid.NewGuid(),
+                IngestionFileId  = ingestionFileId,
                 ShipperShortCode = ssc,
-                MetricKey = metricKey,
-                Value = value.Value,
+                MetricKey        = metricKey,
+                Value            = value.Value,
                 ProductClassCode = productClass,
-                ReportingPeriod = reportingPeriod,
-                CreatedBy = uploadedBy
+                ReportingPeriod  = reportingPeriod,
+                ReportCode       = reportCode,  // ex: "2A.1", "2B.11a" — résolu par ReportCodeResolver
+                EucCode          = eucCode,     // renseigné pour EUC09 (2A.11a/b, 2B.14a/b)
+                CreatedBy        = uploadedBy
             };
         }
 
@@ -149,14 +190,16 @@ public static class MetricValueMapper
 
                 yield return new MetricValue
                 {
-                    Id = Guid.NewGuid(),
-                    IngestionFileId = ingestionFileId,
+                    Id               = Guid.NewGuid(),
+                    IngestionFileId  = ingestionFileId,
                     ShipperShortCode = ssc,
-                    MetricKey = key,
-                    Value = value.Value,
+                    MetricKey        = key,
+                    Value            = value.Value,
                     ProductClassCode = productClass2,
-                    ReportingPeriod = reportingPeriod,
-                    CreatedBy = uploadedBy
+                    ReportingPeriod  = reportingPeriod,
+                    ReportCode       = reportCode,
+                    EucCode          = eucCode,
+                    CreatedBy        = uploadedBy
                 };
             }
         }

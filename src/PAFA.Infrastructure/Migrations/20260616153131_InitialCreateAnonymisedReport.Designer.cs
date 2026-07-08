@@ -2,6 +2,7 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using PAFA.Infrastructure.Persistence;
@@ -11,9 +12,11 @@ using PAFA.Infrastructure.Persistence;
 namespace PAFA.Infrastructure.Migrations
 {
     [DbContext(typeof(PafaDbContext))]
-    partial class PafaDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260616153131_InitialCreateAnonymisedReport")]
+    partial class InitialCreateAnonymisedReport
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -1884,12 +1887,6 @@ namespace PAFA.Infrastructure.Migrations
                         .HasColumnType("uuid")
                         .HasDefaultValueSql("gen_random_uuid()");
 
-                    b.Property<string>("AliasCode")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("character varying(20)")
-                        .HasColumnName("alias_code");
-
                     b.Property<DateTime>("CreatedAt")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("timestamp with time zone")
@@ -1972,6 +1969,82 @@ namespace PAFA.Infrastructure.Migrations
                         .HasDatabaseName("ix_shipper_short_code");
 
                     b.ToTable("shippers", (string)null);
+                });
+
+            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperAlias", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("AliasCode")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)")
+                        .HasColumnName("alias_code");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at")
+                        .HasDefaultValueSql("now()");
+
+                    b.Property<string>("CreatedBy")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("created_by");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true)
+                        .HasColumnName("is_active");
+
+                    b.Property<bool>("IsDeleted")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(false)
+                        .HasColumnName("is_deleted");
+
+                    b.Property<byte[]>("RowVersion")
+                        .IsConcurrencyToken()
+                        .HasColumnType("bytea")
+                        .HasColumnName("row_version");
+
+                    b.Property<Guid>("ShipperId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("shipper_id");
+
+                    b.Property<DateTime?>("UpdatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("updated_at");
+
+                    b.Property<string>("UpdatedBy")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("updated_by");
+
+                    b.Property<DateOnly>("ValidFrom")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_from");
+
+                    b.Property<DateOnly?>("ValidTo")
+                        .HasColumnType("date")
+                        .HasColumnName("valid_to");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("AliasCode")
+                        .HasDatabaseName("ix_shipper_alias_code");
+
+                    b.HasIndex("ShipperId")
+                        .HasDatabaseName("ix_shipper_alias_shipper_id");
+
+                    b.ToTable("shipper_alias", (string)null);
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperProductClass", b =>
@@ -2735,6 +2808,17 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("Report");
                 });
 
+            modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperAlias", b =>
+                {
+                    b.HasOne("PAFA.Domain.Entities.Referential.Shipper", "Shipper")
+                        .WithMany("ShipperAliases")
+                        .HasForeignKey("ShipperId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Shipper");
+                });
+
             modelBuilder.Entity("PAFA.Domain.Entities.Referential.ShipperProductClass", b =>
                 {
                     b.HasOne("PAFA.Domain.Entities.Referential.ProductClass", "ProductClass")
@@ -2848,6 +2932,8 @@ namespace PAFA.Infrastructure.Migrations
                     b.Navigation("MetricValues");
 
                     b.Navigation("ProductClasses");
+
+                    b.Navigation("ShipperAliases");
                 });
 
             modelBuilder.Entity("PAFA.Domain.Entities.ReportType", b =>

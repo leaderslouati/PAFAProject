@@ -200,9 +200,14 @@ public sealed class PersistFilesHandler : IRequestHandler<PersistFilesCommand, P
                         StringComparer.OrdinalIgnoreCase)
                 });
 
+                // ── MapToMetricValues reçoit le nom du fichier source pour que
+                //    ReportCodeResolver puisse déterminer le ReportCode correct
+                //    (ex: MOD520A → 2A.1-2A.10, EUC09 → 2A.11a/b, RPT_1364 → 2B.11a-h).
+                //    Les métriques sont ensuite insérées dans metric_values
+                //    et exposées via les vues SQL vw_2a* / vw_2b* pour Power BI.
                 var metrics = rawRows
                     .SelectMany(row => MetricValueMapper.MapToMetricValues(
-                        row, ingestionFile.Id, reportingPeriod))
+                        row, ingestionFile.Id, reportingPeriod, result.FileName))
                     .ToList();
 
                 if (metrics.Count > 0)

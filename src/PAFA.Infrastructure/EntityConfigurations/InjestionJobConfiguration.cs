@@ -10,27 +10,33 @@ public class IngestionJobConfiguration : IEntityTypeConfiguration<IngestionJob>
     public void Configure(EntityTypeBuilder<IngestionJob> builder)
     {
         builder.ToTable("ingestion_jobs");
+
+        // ── Primary Key ──────────────────────────────────────────
         builder.HasKey(x => x.Id);
 
         builder.Property(x => x.Id)
                .HasColumnName("id")
                .HasDefaultValueSql("gen_random_uuid()");
 
+        // ── Job Properties ───────────────────────────────────────
         builder.Property(x => x.JobName)
                .HasColumnName("job_name")
-               .HasMaxLength(100)
+               .HasMaxLength(200)
                .IsRequired();
 
+        // DateOnly se mappe parfaitement en type "date" dans Postgres
         builder.Property(x => x.ReportingPeriod)
                .HasColumnName("reporting_period")
                .HasColumnType("date")
                .IsRequired();
 
+        // ✅ CORRECTION APPLIQUÉE ICI : Utilisation de l'Enum pour la valeur par défaut
         builder.Property(x => x.Status)
-               .HasColumnName("status")
-               .HasConversion<string>()
-               .HasMaxLength(30)
-               .HasDefaultValue("Started");
+           .HasColumnName("status")
+           .HasConversion<string>()
+           .HasMaxLength(30)
+           .HasDefaultValue(IngestionJobStatus.Started);
+
 
         builder.Property(x => x.FilesExpected)
                .HasColumnName("files_expected");
@@ -51,18 +57,21 @@ public class IngestionJobConfiguration : IEntityTypeConfiguration<IngestionJob>
                .HasColumnName("records_loaded")
                .HasDefaultValue(0);
 
+        // ✅ OPTIMISATION POSTGRESQL : Type jsonb pour parser facilement les erreurs en SQL plus tard
         builder.Property(x => x.ErrorSummary)
                .HasColumnName("error_summary")
-               .HasMaxLength(2000);
+               .HasColumnType("jsonb");
 
         builder.Property(x => x.RetryCount)
                .HasColumnName("retry_count")
                .HasDefaultValue(0);
 
+        // Conversion Enum vers String avec valeur par défaut fortement typée
         builder.Property(x => x.TriggeredBy)
                .HasColumnName("triggered_by")
                .HasConversion<string>()
-               .HasMaxLength(20);
+               .HasMaxLength(30)
+               .HasDefaultValue(JobTrigger.Scheduler);
 
         builder.Property(x => x.StartedAt)
                .HasColumnName("started_at")
@@ -77,6 +86,7 @@ public class IngestionJobConfiguration : IEntityTypeConfiguration<IngestionJob>
         builder.Property(x => x.CorrelationId)
                .HasColumnName("correlation_id");
 
+        // ── Héritage (BaseEntity) ────────────────────────────────
         builder.Property(x => x.CreatedAt)
                .HasColumnName("created_at")
                .HasDefaultValueSql("now()");
@@ -101,6 +111,7 @@ public class IngestionJobConfiguration : IEntityTypeConfiguration<IngestionJob>
                .IsConcurrencyToken()
                .IsRequired(false);
 
+        // ── Indexes ──────────────────────────────────────────────
         builder.HasIndex(x => x.ReportingPeriod)
                .HasDatabaseName("ix_job_period");
 
@@ -110,16 +121,16 @@ public class IngestionJobConfiguration : IEntityTypeConfiguration<IngestionJob>
         builder.HasIndex(x => x.CorrelationId)
                .HasDatabaseName("ix_job_correlation_id");
 
-        // FK Relationships
+        // ── Relations (Foreign Keys) ─────────────────────────────
+
+        // Relation "Self-referencing" pour le système de Retry (ParentJob -> RetryJobs)
         builder.HasOne(x => x.ParentJob)
                .WithMany(x => x.RetryJobs)
                .HasForeignKey(x => x.ParentJobId)
-               .OnDelete(DeleteBehavior.SetNull)
+               .OnDelete(DeleteBehavior.SetNull) // Si le parent est supprimé, on ne perd pas l'historique des retries
                .IsRequired(false);
 
-        builder.HasMany(x => x.IngestionFiles)
-               .WithOne(x => x.IngestionJob)
-               .HasForeignKey(x => x.IngestionJobId)
-               .OnDelete(DeleteBehavior.Cascade);
+        // Note : La relation One-to-Many vers IngestionFiles est implicitement gérée 
+        // ou explicitement définie dans `IngestionFileConfiguration`, ce qui est la bonne pratique.
     }
 }

@@ -23,7 +23,12 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     public DbSet<Shipper> Shippers => Set<Shipper>();
     public DbSet<ProductClass> ProductClasses => Set<ProductClass>();
     public DbSet<ShipperProductClass> ShipperProductClasses => Set<ShipperProductClass>();
-    public DbSet<ShipperAlias> ShipperAliases => Set<ShipperAlias>();
+
+    // NOUVEAU : Référentiel PARR
+    public DbSet<LookupValue> LookupValues => Set<LookupValue>();
+    public DbSet<EucBand> EucBands => Set<EucBand>();
+    public DbSet<ReportDefinition> ReportDefinitions => Set<ReportDefinition>();
+    public DbSet<MetricDefinition> MetricDefinitions => Set<MetricDefinition>();
 
     // ── Ingestion ───────────────────────────────────────────
     public DbSet<IngestionJob> IngestionJobs => Set<IngestionJob>();
@@ -32,12 +37,14 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
     public DbSet<ValidationNotification> ValidationNotifications => Set<ValidationNotification>();
     public DbSet<MetricValue> MetricValues => Set<MetricValue>();
 
-    // ── Reporting ────────────────────────────────────────────
+    // ── Reporting & Fact Tables ──────────────────────────────
     public DbSet<ReportType> ReportTypes => Set<ReportType>();
     public DbSet<Report> Reports => Set<Report>();
-    public DbSet<FactReadPerformance> FactReadPerformances => Set<FactReadPerformance>();       
 
-
+    // Vues et tables de faits (Power BI)
+    public DbSet<FactReadPerformance> FactReadPerformances => Set<FactReadPerformance>();
+    public DbSet<AqCorrectionByReason> AqCorrectionsByReason => Set<AqCorrectionByReason>();
+    public DbSet<SupplyPointSnapshot> SupplyPointSnapshots => Set<SupplyPointSnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -54,10 +61,15 @@ public class PafaDbContext(DbContextOptions<PafaDbContext> options) : DbContext(
         modelBuilder.ApplyConfiguration(new PafaRoleConfiguration());
         modelBuilder.ApplyConfiguration(new PafaUserConfiguration());
         modelBuilder.ApplyConfiguration(new PafaUserRoleConfiguration());
-        modelBuilder.ApplyConfiguration(new ShipperAliasConfiguration());
         modelBuilder.ApplyConfiguration(new PafaPermissionConfiguration());
         modelBuilder.ApplyConfiguration(new PafaRolePermissionConfiguration());
-
+        modelBuilder.ApplyConfiguration(new LookupValueConfiguration());
+        // 👇 AJOUTEZ CES 5 LIGNES POUR ÉVITER LES PROCHAINES ERREURS :
+        modelBuilder.ApplyConfiguration(new EucBandConfiguration());
+        modelBuilder.ApplyConfiguration(new ReportDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new MetricDefinitionConfiguration());
+        modelBuilder.ApplyConfiguration(new AqCorrectionByReasonConfiguration());
+        modelBuilder.ApplyConfiguration(new SupplyPointSnapshotConfiguration());
         // Power BI configurations
         modelBuilder.ApplyConfiguration(new FactReadPerformanceConfiguration());
     }

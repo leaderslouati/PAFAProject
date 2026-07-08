@@ -1,6 +1,7 @@
 ﻿using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using PAFA.Domain.Entities;
+using PAFA.Domain.Enums;
 
 namespace PAFA.Infrastructure.EntityConfigurations;
 
@@ -49,13 +50,13 @@ public class IngestionFileConfiguration : IEntityTypeConfiguration<IngestionFile
                .HasColumnName("status")
                .HasConversion<string>()
                .HasMaxLength(30)
-               .HasDefaultValue("Downloaded");
+               .HasDefaultValue(IngestionFileStatus.Downloaded);
 
         builder.Property(x => x.ValidationStatus)
                .HasColumnName("validation_status")
                .HasConversion<string>()
                .HasMaxLength(30)
-               .HasDefaultValue("Pending");
+               .HasDefaultValue(ValidationStatus.Valid);
 
         builder.Property(x => x.RowsRead)
                .HasColumnName("rows_read");

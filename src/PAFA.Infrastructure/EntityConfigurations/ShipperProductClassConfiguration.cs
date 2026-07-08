@@ -9,7 +9,7 @@ public class ShipperProductClassConfiguration : IEntityTypeConfiguration<Shipper
     public void Configure(EntityTypeBuilder<ShipperProductClass> builder)
     {
         builder.ToTable("shipper_product_classes");
-  
+        builder.HasKey(x => new { x.ShipperId, x.ProductClassId });
         builder.Property(x => x.ShipperId)
                .HasColumnName("shipper_id")
                .IsRequired();

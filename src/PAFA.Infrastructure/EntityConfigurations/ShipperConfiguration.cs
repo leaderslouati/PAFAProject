@@ -22,6 +22,11 @@ public class ShipperConfiguration : IEntityTypeConfiguration<Shipper>
                .HasMaxLength(150)
                .IsRequired();
 
+        builder .Property( x=> x.AliasCode)
+               .HasColumnName("alias_code")
+               .HasMaxLength(20)
+               .IsRequired();   
+
         builder.Property(x => x.LegalEntity)
                .HasColumnName("legal_entity")
                .HasMaxLength(150);
@@ -89,10 +94,6 @@ public class ShipperConfiguration : IEntityTypeConfiguration<Shipper>
                .OnDelete(DeleteBehavior.SetNull)
                .IsRequired(false);
 
-        // Navigation - One-to-Many ShipperAliases
-        builder.HasMany(x => x.ShipperAliases)
-               .WithOne(x => x.Shipper)
-               .HasForeignKey(x => x.ShipperId)
-               .OnDelete(DeleteBehavior.Cascade);
+       
     }
 }
