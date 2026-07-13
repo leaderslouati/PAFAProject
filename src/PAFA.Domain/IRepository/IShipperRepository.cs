@@ -18,4 +18,12 @@ public interface IShipperRepository : IBaseRepository<Shipper>
     /// Find shipper by short code (SSC).
     /// </summary>
     Task<Shipper?> GetByShortCodeAsync(string shortCode, CancellationToken ct = default);
+
+    /// <summary>
+    /// Upsert a list of shippers: inserts new ones and updates existing records
+    /// matched by <see cref="Shipper.ShortCode"/>.
+    /// Returns (inserted, updated) counts.
+    /// </summary>
+    Task<(int Inserted, int Updated)> UpsertShippersAsync(
+        IEnumerable<Shipper> shippers, CancellationToken ct = default);
 }

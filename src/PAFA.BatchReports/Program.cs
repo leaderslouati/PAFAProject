@@ -296,6 +296,10 @@ class Program
                 services.AddScoped<IFileParser, EnergyTheftParser>();
                 services.AddScoped<FileParserFactory>();
 
+                // ── Inspection & seeding ────────────────────────────────
+                services.AddScoped<PAFA.Infrastructure.Parsing.ExcelInspectionService>();
+                services.AddScoped<PAFA.Infrastructure.Parsing.ShipperListFileParser>();
+
                 services.AddMediatR(cfg =>
                     cfg.RegisterServicesFromAssembly(
                         typeof(UploadParrFilesCommand).Assembly));

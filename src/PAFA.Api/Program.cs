@@ -162,6 +162,9 @@ builder.Services.AddHostedService<PAFA.Api.BackgroundServices.IngestionPipelineW
 // ── Excel inspection service (used by ParseAndValidateFilesHandler) ───────────
 builder.Services.AddScoped<PAFA.Infrastructure.Parsing.ExcelInspectionService>();
 
+// ── Shipper list parser (used by SeedShippersFromFileHandler) ─────────────────
+builder.Services.AddScoped<PAFA.Infrastructure.Parsing.ShipperListFileParser>();
+
 builder.Services.AddScoped<ISharePointFileHelper, SharePointFileHelper>();
 
 // ── Notification service — Azure Service Bus ────────────────────────────────

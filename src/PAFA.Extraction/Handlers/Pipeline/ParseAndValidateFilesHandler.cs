@@ -1,5 +1,6 @@
 using MediatR;
 using Microsoft.Extensions.Logging;
+using PAFA.Domain.Constants;
 using PAFA.Domain.Enums;
 using PAFA.Domain.Interfaces;
 using PAFA.Domain.Repositories;
@@ -11,11 +12,14 @@ namespace PAFA.Extraction.Handlers.Pipeline;
 /// <summary>
 /// Step 2 — Parse each imported file with ClosedXML and apply the six pipeline rules:
 ///
-///   Rule 1 — Change of File Name    : file name differs from previous month
-///   Rule 2 — Change of Table Name   : sheet name differs from expected / is generic
-///   Rule 3 — Missing Field          : required column absent
-///   Rule 4 — Change of Shippers     : shipper added or removed vs known list
-///   Rule 5 — Invalid Value          : numeric value out of range (e.g. percentage &gt; 100)
+///   Rule 1 — Change of File Name    : structural base name differs from previous month
+///                                     (date tokens are stripped before comparison;
+///                                      SharePoint version counters "(N)" are also stripped)
+///   Rule 2 — Change of Table Name   : sheet name is generic (Sheet1 / Feuil1 etc.)
+///                                     unless the file type explicitly allows it
+///   Rule 3 — Missing Field          : required column absent (per SourceFileRegistry)
+///   Rule 4 — Change of Shippers     : shipper code found/missing vs known active list
+///   Rule 5 — Invalid Value          : numeric value out of range (e.g. percentage > 100)
 ///   Rule 6 — Hidden Columns         : hidden columns detected in the workbook
 ///
 /// Files that fail validation:
@@ -26,18 +30,6 @@ namespace PAFA.Extraction.Handlers.Pipeline;
 public sealed class ParseAndValidateFilesHandler
     : IRequestHandler<ParseAndValidateFilesCommand, ParseAndValidateFilesResult>
 {
-    // Columns that must be present for every PARR file (case-insensitive).
-    private static readonly Dictionary<string, string[]> RequiredColumnsByPrefix =
-        new(StringComparer.OrdinalIgnoreCase)
-        {
-            ["MOD520A"]   = ["Shipper", "Product Class", "Period"],
-            ["RPT_1364"]  = ["Shipper", "Period"],
-            ["MOD700"]    = ["Shipper", "Period"],
-            ["EUC09"]     = ["Shipper", "Period"],
-            ["TRANSFER"]  = ["Shipper", "Period"],
-            ["CLASS4AQ"]  = ["Shipper", "Period"],
-        };
-
     private static readonly string[] GenericSheetNames =
         ["Sheet1", "Sheet2", "Sheet3", "Feuil1", "Feuil2", "Feuil3"];
 
@@ -68,9 +60,15 @@ public sealed class ParseAndValidateFilesHandler
             "ParseAndValidate", "Starting", importedFiles.Count, correlationId);
 
         // Pre-load shippers once for Rule 4
+        // Index by BOTH Name and ShortCode so we can match whatever column the file uses.
         var knownShippers = await _uow.Shippers.GetActiveShippersAsync(ct);
         var knownShipperNames = knownShippers
-            .Select(s => s.Name?.Trim() ?? string.Empty)
+            .SelectMany(s => new[]
+            {
+                s.Name?.Trim()      ?? string.Empty,
+                s.ShortCode?.Trim() ?? string.Empty,
+                s.AliasCode?.Trim() ?? string.Empty,
+            })
             .Where(n => !string.IsNullOrEmpty(n))
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
@@ -108,19 +106,44 @@ public sealed class ParseAndValidateFilesHandler
                 continue;
             }
 
+            // ── Resolve file descriptor (SourceFileRegistry) ──────────────
+            var descriptor = SourceFileRegistry.Match(imported.FileName);
+
             // ── Rule 1: Change of File Name ────────────────────────────────
-            var prefix = imported.FileName.Split("__", 2)[0].Split('_')[0];
-            var prevSamePrefixFiles = prevFiles
-                .Where(f => f.FileName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            // Compare structural base names (date tokens and SharePoint version
+            // counters stripped) so that a normal monthly date change in the
+            // filename does NOT trigger a false positive.
+            var currentBase = descriptor is not null
+                ? SourceFileRegistry.GetBaseNameForComparison(imported.FileName, descriptor)
+                : Path.GetFileNameWithoutExtension(imported.FileName);
+
+            var prevSameTypeFiles = prevFiles
+                .Where(f =>
+                {
+                    var d = SourceFileRegistry.Match(f.FileName);
+                    // Match by file-key when descriptor is known; fall back to prefix.
+                    if (descriptor is not null && d is not null)
+                        return d.FileKey.Equals(descriptor.FileKey, StringComparison.OrdinalIgnoreCase);
+
+                    // Legacy fallback: match by leading prefix token (e.g. "EUC09")
+                    var legacyPrefix = f.FileName.Split("__", 2)[0].Split('_')[0];
+                    return imported.FileName.StartsWith(legacyPrefix, StringComparison.OrdinalIgnoreCase);
+                })
                 .ToList();
 
-            if (prevSamePrefixFiles.Count > 0)
+            if (prevSameTypeFiles.Count > 0)
             {
-                var changed = prevSamePrefixFiles
-                    .Where(f => !f.FileName.Equals(imported.FileName, StringComparison.OrdinalIgnoreCase))
+                var changed = prevSameTypeFiles
+                    .Where(f =>
+                    {
+                        var prevBase = descriptor is not null
+                            ? SourceFileRegistry.GetBaseNameForComparison(f.FileName, descriptor)
+                            : Path.GetFileNameWithoutExtension(f.FileName);
+                        return !prevBase.Equals(currentBase, StringComparison.OrdinalIgnoreCase);
+                    })
                     .Take(10)
                     .Select((f, i) => new ValidationExample(i + 1,
-                        $"Previous: {f.FileName} | Current: {imported.FileName}"))
+                        $"Previous base: '{SourceFileRegistry.GetBaseNameForComparison(f.FileName, descriptor ?? SourceFileRegistry.Match(f.FileName)!)}' | Current base: '{currentBase}'"))
                     .ToList();
 
                 if (changed.Count > 0)
@@ -128,49 +151,67 @@ public sealed class ParseAndValidateFilesHandler
             }
 
             // ── Rule 2: Change of Table Name (generic sheet names) ─────────
-            var genericSheets = inspection.SheetNames
-                .Where(n => GenericSheetNames.Contains(n, StringComparer.OrdinalIgnoreCase)
-                         || string.IsNullOrWhiteSpace(n))
-                .Take(10)
-                .Select((n, i) => new ValidationExample(i + 1,
-                    $"Sheet with non-descriptive name: '{n}'"))
-                .ToList();
+            // Skip Rule 2 for file types that are known to have generic sheet
+            // names by design (e.g. DDP files delivered with Sheet1).
+            bool allowGeneric = descriptor?.AllowGenericSheetNames ?? false;
+            if (!allowGeneric)
+            {
+                var genericSheets = inspection.SheetNames
+                    .Where(n => GenericSheetNames.Contains(n, StringComparer.OrdinalIgnoreCase)
+                             || string.IsNullOrWhiteSpace(n))
+                    .Take(10)
+                    .Select((n, i) => new ValidationExample(i + 1,
+                        $"Sheet with non-descriptive name: '{n}'"))
+                    .ToList();
 
-            if (genericSheets.Count > 0)
-                errors.Add(new PipelineValidationError("Rule 2 — Change of Table Name", genericSheets));
+                if (genericSheets.Count > 0)
+                    errors.Add(new PipelineValidationError("Rule 2 — Change of Table Name", genericSheets));
+            }
 
             // ── Rule 3: Missing Field ──────────────────────────────────────
-            var matchedPrefix = RequiredColumnsByPrefix.Keys
-                .FirstOrDefault(k => imported.FileName.StartsWith(k, StringComparison.OrdinalIgnoreCase));
-
-            var requiredCols = matchedPrefix is not null
-                ? RequiredColumnsByPrefix[matchedPrefix]
-                : [];
+            // Required columns come from SourceFileRegistry when the file type
+            // is known; the visible-column check is case-insensitive.
+            var requiredCols = descriptor?.RequiredColumns ?? [];
 
             var missingCols = requiredCols
-                .Where(col => !inspection.VisibleColumns.Contains(col))
+                .Where(col => !inspection.VisibleColumns
+                    .Any(vc => vc.Equals(col, StringComparison.OrdinalIgnoreCase)))
                 .Take(10)
                 .Select((col, i) => new ValidationExample(i + 1,
-                    $"Required column '{col}' not found"))
+                    $"Required column '{col}' not found in workbook"))
                 .ToList();
 
             if (missingCols.Count > 0)
                 errors.Add(new PipelineValidationError("Rule 3 — Missing Field", missingCols));
 
             // ── Rule 4: Change of Shippers ─────────────────────────────────
-            if (inspection.VisibleColumns.Contains("Shipper", StringComparer.OrdinalIgnoreCase))
+            // Find the first shipper-identifier column that exists in the workbook.
+            // SourceFileRegistry provides the ordered list of aliases per file type.
+            var shipperColumnAliases = descriptor?.ShipperColumnAliases
+                ?? ["Shipper", "Shipper Short Code", "SRVC_PRVDR_CD"];
+
+            var shipperColumn = shipperColumnAliases
+                .FirstOrDefault(alias => inspection.VisibleColumns
+                    .Any(vc => vc.Equals(alias, StringComparison.OrdinalIgnoreCase)));
+
+            if (shipperColumn is not null)
             {
+                var resolvedColumn = inspection.VisibleColumns
+                    .First(vc => vc.Equals(shipperColumn, StringComparison.OrdinalIgnoreCase));
+
                 var fileShippers = inspection.DataRows
-                    .Select(r => r.Values.TryGetValue("Shipper", out var v) ? v.Trim() : string.Empty)
+                    .Select(r => r.Values.TryGetValue(resolvedColumn, out var v) ? v.Trim() : string.Empty)
                     .Where(s => !string.IsNullOrEmpty(s))
                     .ToHashSet(StringComparer.OrdinalIgnoreCase);
 
                 var newShippers = fileShippers.Except(knownShipperNames).Take(10)
-                    .Select((s, i) => new ValidationExample(i + 1, $"New shipper: '{s}'"))
+                    .Select((s, i) => new ValidationExample(i + 1,
+                        $"New shipper: '{s}' (column: {resolvedColumn})"))
                     .ToList();
 
                 var removedShippers = knownShipperNames.Except(fileShippers).Take(10)
-                    .Select((s, i) => new ValidationExample(i + 1, $"Missing shipper: '{s}'"))
+                    .Select((s, i) => new ValidationExample(i + 1,
+                        $"Missing shipper: '{s}' (column: {resolvedColumn})"))
                     .ToList();
 
                 var shipperExamples = newShippers.Concat(removedShippers).Take(10).ToList();

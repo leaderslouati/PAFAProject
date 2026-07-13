@@ -110,7 +110,7 @@ public sealed class PersistFileCommandHandler
             foreach (var row in rows)
             {
                 if (errorRows.Contains(row.RowNumber)) continue;
-                metrics.AddRange(MetricValueMapper.MapToMetricValues(row, file.Id, job.ReportingPeriod));
+               // metrics.AddRange(MetricValueMapper.MapToMetricValues(row, file.Id, job.ReportingPeriod));
             }
 
             if (metrics.Count != 0)
